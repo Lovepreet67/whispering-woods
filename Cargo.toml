@@ -1,0 +1,2 @@
+[workspace]
+members = ["datanode","namenode", "proto","storage"]
