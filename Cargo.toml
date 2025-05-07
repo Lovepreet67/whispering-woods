@@ -1,2 +1,3 @@
+resolver = "3"
 [workspace]
-members = ["datanode","namenode", "proto","storage"]
+members = [ "client","datanode","namenode", "proto","storage"]
