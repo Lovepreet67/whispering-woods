@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package data;
+
+service ClientDataNode {
+  rpc Echo(EchoRequest) returns (EchoResponse);
+  rpc SaveChunk(SaveChunkRequest) returns (SaveChunkResponse);
+  rpc CreatePipeline(CreatePipelineRequest) returns (CreatePipelineResponse);
+
+}
+
+message EchoRequest {
+  string message = 1;
+}
+
+message EchoResponse {
+ string message = 1;
+}
+
+message SaveChunkRequest {
+  string chunk_id = 1;
+  repeated string replica_set = 2;
+}
+message SaveChunkResponse {
+  string address =1;
+}
+
+message CreatePipelineRequest {
+  string chunk_id =1;
+  repeated string replica_set = 2;
+}
+message CreatePipelineResponse {
+  string address = 1;
+}

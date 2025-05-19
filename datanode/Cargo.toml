@@ -5,3 +5,6 @@ edition = "2024"
 
 [dependencies]
 storage = {path="../storage"}
+proto = {path="../proto"}
+tonic = "0.13.1"
+tokio = { version = "1.45.0", features = ["full"] }
