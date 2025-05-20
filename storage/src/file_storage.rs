@@ -9,6 +9,7 @@ use tokio::{
     io::copy,
 };
 
+#[derive(Clone)]
 pub struct FileStorage {
     root: String,
 }
@@ -34,7 +35,7 @@ impl Storage for FileStorage {
     async fn read(
         &self,
         chunk_id: String,
-    ) -> Result<Box<dyn tokio::io::AsyncRead + Unpin>, Box<dyn Error>> {
+    ) -> Result<Box<dyn tokio::io::AsyncRead + Unpin + Send>, Box<dyn Error>> {
         let chunk_path = self.get_path(&chunk_id);
         let chunk_file = File::open(chunk_path).await?;
         Ok(Box::new(chunk_file))

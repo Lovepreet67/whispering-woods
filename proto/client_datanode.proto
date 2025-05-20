@@ -1,12 +1,10 @@
 syntax = "proto3";
 
-package data;
+package client_datanode;
 
 service ClientDataNode {
   rpc Echo(EchoRequest) returns (EchoResponse);
   rpc SaveChunk(SaveChunkRequest) returns (SaveChunkResponse);
-  rpc CreatePipeline(CreatePipelineRequest) returns (CreatePipelineResponse);
-
 }
 
 message EchoRequest {
@@ -25,10 +23,3 @@ message SaveChunkResponse {
   string address =1;
 }
 
-message CreatePipelineRequest {
-  string chunk_id =1;
-  repeated string replica_set = 2;
-}
-message CreatePipelineResponse {
-  string address = 1;
-}

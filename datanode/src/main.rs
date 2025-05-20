@@ -1,48 +1,46 @@
+use log::info;
+use std::env;
 use std::error::Error;
 
-use proto::generated::client_data_node_server::{ClientDataNode, ClientDataNodeServer};
-use proto::generated::{EchoRequest, EchoResponse,CreatePipelineRequest,CreatePipelineResponse,SaveChunkRequest,SaveChunkResponse};
-
+pub mod client_handler;
+pub mod peer_handler;
+pub mod tcp_service;
+use client_handler::ClientHandler;
+use proto::generated::client_data_node_server::ClientDataNodeServer;
+use proto::generated::peer_server::PeerServer;
+use storage::file_storage;
 use tonic::transport::Server;
-
-#[derive(Default, Debug)]
-struct ClientHandler {}
-
-#[tonic::async_trait]
-impl ClientDataNode for ClientHandler {
-    async fn echo(
-        &self,
-        request: tonic::Request<EchoRequest>,
-    ) -> Result<tonic::Response<EchoResponse>, tonic::Status> {
-        let request = request.get_ref();
-        let response = EchoResponse {
-            message: format!("echo {}", request.message).clone(),
-        };
-        Ok(tonic::Response::new(response))
-    }
-    async fn create_pipeline(&self,request:tonic::Request<CreatePipelineRequest>)->Result<tonic::Response<CreatePipelineResponse>,tonic::Status>{
-        let response = CreatePipelineResponse {
-            address: "hello".to_owned()
-        };
-        Ok(tonic::Response::new(response))
-    }
-    async fn save_chunk(&self,request: tonic::Request<SaveChunkRequest>) ->Result<tonic::Response<SaveChunkResponse>,tonic::Status>{
-        let response = SaveChunkResponse{
-            address:"saved".to_owned()
-        };
-        Ok(tonic::Response::new(response))
-    }
-
-
-}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let addr = "127.0.0.1:3000".parse()?;
-    let ch = ClientHandler::default();
-    Server::builder()
+    env_logger::init();
+    let args: Vec<String> = env::args().collect();
+    let grpc_port = if args.len() > 1 {
+        args[1].clone()
+    } else {
+        "3000".to_owned()
+    };
+    let tcp_port = if args.len() > 2 {
+        args[2].clone()
+    } else {
+        "3001".to_owned()
+    };
+    let addr = format!("127.0.0.1:{}", grpc_port).parse()?;
+    info!("Starting the grpc server on address : {addr}");
+    let ch = ClientHandler;
+    let ph = peer_handler::PeerHandler;
+
+    // first we will start grpc server
+    let grpc_server = Server::builder()
         .add_service(ClientDataNodeServer::new(ch))
-        .serve(addr)
-        .await?;
+        .add_service(PeerServer::new(ph))
+        .serve(addr);
+    tokio::spawn(grpc_server);
+    // we will create storage which will be used by the tcp service to serve a file
+    let store = file_storage::FileStorage::new("./temp".to_owned());
+    info!("Starting the tcp server on grpc port: {}", tcp_port);
+    let tcp_handler = tcp_service::TCPService::new(tcp_port, store).await?;
+    tcp_handler.start_and_accept().await?;
+    info!("Server s address : {addr}");
     Ok(())
 }

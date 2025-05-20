@@ -21,18 +21,6 @@ pub struct SaveChunkResponse {
     #[prost(string, tag = "1")]
     pub address: ::prost::alloc::string::String,
 }
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct CreatePipelineRequest {
-    #[prost(string, tag = "1")]
-    pub chunk_id: ::prost::alloc::string::String,
-    #[prost(string, repeated, tag = "2")]
-    pub replica_set: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
-}
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct CreatePipelineResponse {
-    #[prost(string, tag = "1")]
-    pub address: ::prost::alloc::string::String,
-}
 /// Generated client implementations.
 pub mod client_data_node_client {
     #![allow(
@@ -137,9 +125,12 @@ pub mod client_data_node_client {
                     )
                 })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/data.ClientDataNode/Echo");
+            let path = http::uri::PathAndQuery::from_static(
+                "/client_datanode.ClientDataNode/Echo",
+            );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new("data.ClientDataNode", "Echo"));
+            req.extensions_mut()
+                .insert(GrpcMethod::new("client_datanode.ClientDataNode", "Echo"));
             self.inner.unary(req, path, codec).await
         }
         pub async fn save_chunk(
@@ -159,35 +150,11 @@ pub mod client_data_node_client {
                 })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
-                "/data.ClientDataNode/SaveChunk",
+                "/client_datanode.ClientDataNode/SaveChunk",
             );
             let mut req = request.into_request();
             req.extensions_mut()
-                .insert(GrpcMethod::new("data.ClientDataNode", "SaveChunk"));
-            self.inner.unary(req, path, codec).await
-        }
-        pub async fn create_pipeline(
-            &mut self,
-            request: impl tonic::IntoRequest<super::CreatePipelineRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::CreatePipelineResponse>,
-            tonic::Status,
-        > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/data.ClientDataNode/CreatePipeline",
-            );
-            let mut req = request.into_request();
-            req.extensions_mut()
-                .insert(GrpcMethod::new("data.ClientDataNode", "CreatePipeline"));
+                .insert(GrpcMethod::new("client_datanode.ClientDataNode", "SaveChunk"));
             self.inner.unary(req, path, codec).await
         }
     }
@@ -214,13 +181,6 @@ pub mod client_data_node_server {
             request: tonic::Request<super::SaveChunkRequest>,
         ) -> std::result::Result<
             tonic::Response<super::SaveChunkResponse>,
-            tonic::Status,
-        >;
-        async fn create_pipeline(
-            &self,
-            request: tonic::Request<super::CreatePipelineRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::CreatePipelineResponse>,
             tonic::Status,
         >;
     }
@@ -300,7 +260,7 @@ pub mod client_data_node_server {
         }
         fn call(&mut self, req: http::Request<B>) -> Self::Future {
             match req.uri().path() {
-                "/data.ClientDataNode/Echo" => {
+                "/client_datanode.ClientDataNode/Echo" => {
                     #[allow(non_camel_case_types)]
                     struct EchoSvc<T: ClientDataNode>(pub Arc<T>);
                     impl<
@@ -344,7 +304,7 @@ pub mod client_data_node_server {
                     };
                     Box::pin(fut)
                 }
-                "/data.ClientDataNode/SaveChunk" => {
+                "/client_datanode.ClientDataNode/SaveChunk" => {
                     #[allow(non_camel_case_types)]
                     struct SaveChunkSvc<T: ClientDataNode>(pub Arc<T>);
                     impl<
@@ -374,52 +334,6 @@ pub mod client_data_node_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let method = SaveChunkSvc(inner);
-                        let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
-                        let res = grpc.unary(method, req).await;
-                        Ok(res)
-                    };
-                    Box::pin(fut)
-                }
-                "/data.ClientDataNode/CreatePipeline" => {
-                    #[allow(non_camel_case_types)]
-                    struct CreatePipelineSvc<T: ClientDataNode>(pub Arc<T>);
-                    impl<
-                        T: ClientDataNode,
-                    > tonic::server::UnaryService<super::CreatePipelineRequest>
-                    for CreatePipelineSvc<T> {
-                        type Response = super::CreatePipelineResponse;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<super::CreatePipelineRequest>,
-                        ) -> Self::Future {
-                            let inner = Arc::clone(&self.0);
-                            let fut = async move {
-                                <T as ClientDataNode>::create_pipeline(&inner, request)
-                                    .await
-                            };
-                            Box::pin(fut)
-                        }
-                    }
-                    let accept_compression_encodings = self.accept_compression_encodings;
-                    let send_compression_encodings = self.send_compression_encodings;
-                    let max_decoding_message_size = self.max_decoding_message_size;
-                    let max_encoding_message_size = self.max_encoding_message_size;
-                    let inner = self.inner.clone();
-                    let fut = async move {
-                        let method = CreatePipelineSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
@@ -470,7 +384,7 @@ pub mod client_data_node_server {
         }
     }
     /// Generated gRPC service name
-    pub const SERVICE_NAME: &str = "data.ClientDataNode";
+    pub const SERVICE_NAME: &str = "client_datanode.ClientDataNode";
     impl<T> tonic::server::NamedService for ClientDataNodeServer<T> {
         const NAME: &'static str = SERVICE_NAME;
     }

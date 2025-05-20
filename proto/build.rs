@@ -5,6 +5,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         .out_dir("src/generated/")
         .build_client(true)
         .build_server(true)
-        .compile_protos(&["data.proto"], &["."])?;
+        .compile_protos(
+            &["client_datanode.proto", "datanode_datanode.proto"],
+            &["."],
+        )?;
     Ok(())
 }

@@ -1,3 +1,4 @@
 pub mod generated {
-   include!("./generated/data.rs");
+    include!("./generated/client_datanode.rs");
+    include!("./generated/datanode_datanode.rs");
 }
