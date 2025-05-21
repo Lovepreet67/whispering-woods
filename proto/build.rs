@@ -6,7 +6,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         .build_client(true)
         .build_server(true)
         .compile_protos(
-            &["client_datanode.proto", "datanode_datanode.proto"],
+            &[
+                "client_datanode.proto",
+                "datanode_datanode.proto",
+                "client_namenode.proto",
+            ],
             &["."],
         )?;
     Ok(())

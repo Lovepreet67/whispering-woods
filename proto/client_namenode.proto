@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package client_namenode;
+
+service ClientNameNode{
+  rpc StoreFile(StoreFileRequest) returns (StoreFileResponse);
+  rpc FetchFile(FetchFileRequest) returns (FetchFileResponse);
+  rpc DeleteFile(DeleteFileRequest) returns (DeleteFileResponse);
+}
+
+message DataNodeMeta {
+  string name =1;
+  string addrs =2;
+}
+message ChunkMeta {
+  string id = 1;
+  uint64 size =2;
+  uint32 order = 3;
+  repeated DataNodeMeta location =4; 
+}
+
+message FetchFileRequest{
+    string file_name = 1;
+}
+
+message FetchFileResponse {
+  string file_name =1;
+  repeated ChunkMeta chunk_list =2;
+}
+
+message StoreFileRequest{
+    string file_name =1;
+    uint64 file_size =2;
+}
+message StoreFileResponse{
+ string file_name =1;
+ repeated ChunkMeta chunk_list =2;
+}
+
+message DeleteFileRequest{
+  string file_name = 1;  
+}
+message DeleteFileResponse{
+  bool file_present = 1;
+}
