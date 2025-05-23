@@ -4,7 +4,7 @@ package client_datanode;
 
 service ClientDataNode {
   rpc Echo(EchoRequest) returns (EchoResponse);
-  rpc SaveChunk(SaveChunkRequest) returns (SaveChunkResponse);
+  rpc StoreChunk(StoreChunkRequest) returns (StoreChunkResponse);
 }
 
 message EchoRequest {
@@ -15,11 +15,11 @@ message EchoResponse {
  string message = 1;
 }
 
-message SaveChunkRequest {
+message StoreChunkRequest {
   string chunk_id = 1;
   repeated string replica_set = 2;
 }
-message SaveChunkResponse {
+message StoreChunkResponse {
   string address =1;
 }
 

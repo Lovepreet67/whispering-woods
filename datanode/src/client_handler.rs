@@ -1,5 +1,5 @@
 use proto::generated::client_data_node_server::ClientDataNode;
-use proto::generated::{EchoRequest, EchoResponse, SaveChunkRequest, SaveChunkResponse};
+use proto::generated::{EchoRequest, EchoResponse, StoreChunkRequest, StoreChunkResponse};
 
 #[derive(Default, Debug)]
 pub struct ClientHandler;
@@ -16,11 +16,11 @@ impl ClientDataNode for ClientHandler {
         };
         Ok(tonic::Response::new(response))
     }
-    async fn save_chunk(
+    async fn store_chunk(
         &self,
-        _request: tonic::Request<SaveChunkRequest>,
-    ) -> Result<tonic::Response<SaveChunkResponse>, tonic::Status> {
-        let response = SaveChunkResponse {
+        _request: tonic::Request<StoreChunkRequest>,
+    ) -> Result<tonic::Response<StoreChunkResponse>, tonic::Status> {
+        let response = StoreChunkResponse {
             address: "saved".to_owned(),
         };
         Ok(tonic::Response::new(response))

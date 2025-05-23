@@ -10,14 +10,14 @@ pub struct EchoResponse {
     pub message: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct SaveChunkRequest {
+pub struct StoreChunkRequest {
     #[prost(string, tag = "1")]
     pub chunk_id: ::prost::alloc::string::String,
     #[prost(string, repeated, tag = "2")]
     pub replica_set: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct SaveChunkResponse {
+pub struct StoreChunkResponse {
     #[prost(string, tag = "1")]
     pub address: ::prost::alloc::string::String,
 }
@@ -133,11 +133,11 @@ pub mod client_data_node_client {
                 .insert(GrpcMethod::new("client_datanode.ClientDataNode", "Echo"));
             self.inner.unary(req, path, codec).await
         }
-        pub async fn save_chunk(
+        pub async fn store_chunk(
             &mut self,
-            request: impl tonic::IntoRequest<super::SaveChunkRequest>,
+            request: impl tonic::IntoRequest<super::StoreChunkRequest>,
         ) -> std::result::Result<
-            tonic::Response<super::SaveChunkResponse>,
+            tonic::Response<super::StoreChunkResponse>,
             tonic::Status,
         > {
             self.inner
@@ -150,11 +150,11 @@ pub mod client_data_node_client {
                 })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
-                "/client_datanode.ClientDataNode/SaveChunk",
+                "/client_datanode.ClientDataNode/StoreChunk",
             );
             let mut req = request.into_request();
             req.extensions_mut()
-                .insert(GrpcMethod::new("client_datanode.ClientDataNode", "SaveChunk"));
+                .insert(GrpcMethod::new("client_datanode.ClientDataNode", "StoreChunk"));
             self.inner.unary(req, path, codec).await
         }
     }
@@ -176,11 +176,11 @@ pub mod client_data_node_server {
             &self,
             request: tonic::Request<super::EchoRequest>,
         ) -> std::result::Result<tonic::Response<super::EchoResponse>, tonic::Status>;
-        async fn save_chunk(
+        async fn store_chunk(
             &self,
-            request: tonic::Request<super::SaveChunkRequest>,
+            request: tonic::Request<super::StoreChunkRequest>,
         ) -> std::result::Result<
-            tonic::Response<super::SaveChunkResponse>,
+            tonic::Response<super::StoreChunkResponse>,
             tonic::Status,
         >;
     }
@@ -304,25 +304,25 @@ pub mod client_data_node_server {
                     };
                     Box::pin(fut)
                 }
-                "/client_datanode.ClientDataNode/SaveChunk" => {
+                "/client_datanode.ClientDataNode/StoreChunk" => {
                     #[allow(non_camel_case_types)]
-                    struct SaveChunkSvc<T: ClientDataNode>(pub Arc<T>);
+                    struct StoreChunkSvc<T: ClientDataNode>(pub Arc<T>);
                     impl<
                         T: ClientDataNode,
-                    > tonic::server::UnaryService<super::SaveChunkRequest>
-                    for SaveChunkSvc<T> {
-                        type Response = super::SaveChunkResponse;
+                    > tonic::server::UnaryService<super::StoreChunkRequest>
+                    for StoreChunkSvc<T> {
+                        type Response = super::StoreChunkResponse;
                         type Future = BoxFuture<
                             tonic::Response<Self::Response>,
                             tonic::Status,
                         >;
                         fn call(
                             &mut self,
-                            request: tonic::Request<super::SaveChunkRequest>,
+                            request: tonic::Request<super::StoreChunkRequest>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {
-                                <T as ClientDataNode>::save_chunk(&inner, request).await
+                                <T as ClientDataNode>::store_chunk(&inner, request).await
                             };
                             Box::pin(fut)
                         }
@@ -333,7 +333,7 @@ pub mod client_data_node_server {
                     let max_encoding_message_size = self.max_encoding_message_size;
                     let inner = self.inner.clone();
                     let fut = async move {
-                        let method = SaveChunkSvc(inner);
+                        let method = StoreChunkSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(

@@ -13,6 +13,7 @@ pub struct NamenodeHandler {
 
 impl NamenodeHandler {
     pub async fn new(addrs: String) -> Self {
+        println!("connecting namenode at {:?}", addrs);
         let connection = Self::get_connection(addrs.clone()).await.unwrap();
         NamenodeHandler {
             address: addrs,
