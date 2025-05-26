@@ -11,9 +11,9 @@ pub struct ChunkMeta {
     #[prost(string, tag = "1")]
     pub id: ::prost::alloc::string::String,
     #[prost(uint64, tag = "2")]
-    pub size: u64,
-    #[prost(uint32, tag = "3")]
-    pub order: u32,
+    pub start_offset: u64,
+    #[prost(uint64, tag = "3")]
+    pub end_offset: u64,
     #[prost(message, repeated, tag = "4")]
     pub location: ::prost::alloc::vec::Vec<DataNodeMeta>,
 }

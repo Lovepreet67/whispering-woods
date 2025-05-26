@@ -1,11 +1,8 @@
 use std::{error::Error, str::FromStr, time::Duration};
 
-use proto::generated::{StoreChunkRequest, client_data_node_client::ClientDataNodeClient};
-use tokio::{fs::File, io::AsyncWriteExt};
-use tonic::{
-    Request,
-    transport::{Channel, Endpoint},
-};
+use proto::generated::{client_datanode::{client_data_node_client::ClientDataNodeClient, StoreChunkRequest}, client_namenode::DataNodeMeta};
+use tokio::io::{AsyncRead, AsyncWriteExt};
+use tonic::transport::{Channel, Endpoint};
 
 pub struct ChunkHandler {}
 impl ChunkHandler {
@@ -31,36 +28,42 @@ impl ChunkHandler {
     ) -> Result<tokio::net::TcpStream, Box<dyn Error>> {
         tokio::net::TcpStream::connect(addrs)
             .await
-            .map_err(|e| format!("Error while connecting to stream at {:?} {:?}", addrs,e).into())
+            .map_err(|e| format!("Error while connecting to stream at {:?} {:?}", addrs, e).into())
     }
     pub async fn store_chunk(
         &mut self,
         chunk_id: String,
-        replica_set: Vec<String>,
-        mut read_stream: File,
+        replica_set: Vec<DataNodeMeta>,
+        read_stream: &mut (impl AsyncRead + Unpin),
     ) -> Result<(), Box<dyn Error>> {
-        if replica_set.is_empty(){
+        if replica_set.is_empty() {
             return Err("Empty replica set".into());
         }
         let store_chunk_request = StoreChunkRequest {
             chunk_id: chunk_id.clone(),
             replica_set: replica_set.clone(),
         };
-        let mut data_node_grpc_client = self.get_grpc_connection(&replica_set[0]).await?;
+        let mut data_node_grpc_client = self.get_grpc_connection(&replica_set[0].addrs).await?;
         // getting tcp address for the first replica set to which we will stream the read stream
         let store_chunk_response = data_node_grpc_client
             .store_chunk(tonic::Request::new(store_chunk_request))
             .await?;
-        let tcp_addrs = &store_chunk_response
-            .get_ref().address;
+        let tcp_addrs = &store_chunk_response.get_ref().address;
 
         // connect to tcp stream and push data as [chunk_id,write_mode,bytes from stream]
-        let mut tcp_stream = self
-            .get_tcp_connection(tcp_addrs)
-            .await?;
+        let mut tcp_stream = self.get_tcp_connection(tcp_addrs).await?;
         tcp_stream.write_all(chunk_id.as_bytes()).await?;
         tcp_stream.write_u8(1).await?;
-        tokio::io::copy(&mut read_stream, &mut tcp_stream).await?;
+        tokio::io::copy(read_stream, &mut tcp_stream).await?;
         Ok(())
+    }
+    pub async fn fetch_chunk(
+        &mut self,
+        chunk_id: String,
+        datanode_addrs: String,
+    ) -> Result<impl AsyncRead + Unpin, Box<dyn Error>> {
+        let mut tcp_stream = self.get_tcp_connection(&datanode_addrs).await?;
+        tcp_stream.write_all(chunk_id.as_bytes()).await?;
+        Ok(tcp_stream)
     }
 }

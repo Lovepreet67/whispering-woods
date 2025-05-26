@@ -1,13 +1,16 @@
 use std::error::Error;
 
-use crate::namenode_handler::NamenodeHandler;
+use crate::{
+    chunk_handler::ChunkHandler, file_chunker::{self, FileChunker}, namenode_handler::NamenodeHandler
+};
 
 pub struct CommandRunner {
     namenode: NamenodeHandler,
+    datanode: ChunkHandler
 }
 impl CommandRunner {
     pub fn new(namenode: NamenodeHandler) -> Self {
-        CommandRunner { namenode }
+        CommandRunner { namenode ,datanode:ChunkHandler::new()}
     }
     pub async fn handle_input(&mut self, command: &mut str) -> Result<String, Box<dyn Error>> {
         match command {
@@ -36,7 +39,7 @@ impl CommandRunner {
                         "Invalid delete command ussage please use <help> to get help".into(),
                     );
                 }
-                return self.handle_delete_file_command(inputs[1].to_owned()).await;
+return self.handle_delete_file_command(inputs[1].to_owned()).await;
             }
             help_command if help_command == "help\n" => {
                 Ok("fetch command : fetch remote_file_location target_file_path\nstore command : store source_file_location target_remote_file_name\ndelete command : delete target_remote_file_name\n".to_owned())
@@ -66,10 +69,16 @@ impl CommandRunner {
         }
         // request namenode for chunk details
         println!("file size : {}", file_metadata.len());
-        //let chunk_details = self.namenode.store_file(remote_file_name,file_metadata.len()).await?;
+        let chunk_details = self
+            .namenode
+            .store_file(remote_file_name, file_metadata.len())
+            .await?;
+        let mut file_chunker = FileChunker::new(local_file_path.clone(), &chunk_details);
         // send each data node to setup pilepline
-        // use chunk handler to send this data;
-        // handler the chunk transformation
+        for chunk_detail in &chunk_details {
+            let mut read_stream = file_chunker.next_chunk().await?;
+            self.datanode.store_chunk(chunk_detail.id.clone(),chunk_detail.location.clone(),&mut read_stream).await?;
+        }
         Ok("File stored successfully".to_owned())
     }
     async fn handle_fetch_file_command(

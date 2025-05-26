@@ -14,8 +14,8 @@ message DataNodeMeta {
 }
 message ChunkMeta {
   string id = 1;
-  uint64 size =2;
-  uint32 order = 3;
+  uint64 start_offset=2;
+  uint64 end_offset=3;
   repeated DataNodeMeta location =4; 
 }
 

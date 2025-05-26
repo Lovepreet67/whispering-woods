@@ -1,5 +1,5 @@
-use proto::generated::client_data_node_server::ClientDataNode;
-use proto::generated::{EchoRequest, EchoResponse, StoreChunkRequest, StoreChunkResponse};
+use proto::generated::client_datanode::client_data_node_server::ClientDataNode;
+use proto::generated::client_datanode::{EchoRequest, EchoResponse, StoreChunkRequest, StoreChunkResponse};
 
 #[derive(Default, Debug)]
 pub struct ClientHandler;

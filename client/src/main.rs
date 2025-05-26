@@ -5,7 +5,7 @@ use namenode_handler::NamenodeHandler;
 
 mod chunk_handler;
 mod command_runner;
-mod file_handler;
+mod file_chunker;
 mod namenode_handler;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {

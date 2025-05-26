@@ -6,8 +6,8 @@ pub mod client_handler;
 pub mod peer_handler;
 pub mod tcp_service;
 use client_handler::ClientHandler;
-use proto::generated::client_data_node_server::ClientDataNodeServer;
-use proto::generated::peer_server::PeerServer;
+use proto::generated::client_datanode::client_data_node_server::ClientDataNodeServer;
+use proto::generated::datanode_datanode::peer_server::PeerServer;
 use storage::file_storage;
 use tonic::transport::Server;
 

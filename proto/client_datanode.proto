@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package client_datanode;
 
+import "client_namenode.proto";
+
 service ClientDataNode {
   rpc Echo(EchoRequest) returns (EchoResponse);
   rpc StoreChunk(StoreChunkRequest) returns (StoreChunkResponse);
@@ -17,7 +19,7 @@ message EchoResponse {
 
 message StoreChunkRequest {
   string chunk_id = 1;
-  repeated string replica_set = 2;
+  repeated client_namenode.DataNodeMeta replica_set = 2;
 }
 message StoreChunkResponse {
   string address =1;

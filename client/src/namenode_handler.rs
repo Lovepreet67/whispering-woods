@@ -1,6 +1,6 @@
 use std::{error::Error, time::Duration};
 
-use proto::generated::{
+use proto::generated::client_namenode::{
     ChunkMeta, DeleteFileRequest, FetchFileRequest, StoreFileRequest,
     client_name_node_client::ClientNameNodeClient,
 };
