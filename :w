@@ -1,17 +1,14 @@
-use std::{env, error::Error};
-
 use namenode_server::NamenodeServer;
-use proto::generated::client_namenode::client_name_node_server::ClientNameNodeServer;
-use tonic::transport::Server;
+use proto::generated::client_namenode::client_name_node_server::{ClientNameNode, ClientNameNodeServer};
 
-mod chunk_generator;
-mod data_structure;
-mod datanode_selection_policy;
-mod namenode_server;
 mod namenode_state;
+mod namenode_server;
+mod datanode_selection_policy;
+mod data_structure;
+mod chunk_generator;
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
+async fn main()->Result<(), _> {
     let args: Vec<String> = env::args().collect();
     let grpc_port = if args.len() > 1 {
         args[1].clone()
@@ -23,7 +20,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // first we will start grpc server
     Server::builder()
         .add_service(ClientNameNodeServer::new(NamenodeServer::new()))
-        .serve(addr)
-        .await?;
+        .serve(addr).await?.;
     Ok(())
+
 }

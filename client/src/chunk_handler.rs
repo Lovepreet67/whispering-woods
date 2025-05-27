@@ -1,6 +1,9 @@
 use std::{error::Error, str::FromStr, time::Duration};
 
-use proto::generated::{client_datanode::{client_data_node_client::ClientDataNodeClient, StoreChunkRequest}, client_namenode::DataNodeMeta};
+use proto::generated::{
+    client_datanode::{StoreChunkRequest, client_data_node_client::ClientDataNodeClient},
+    client_namenode::DataNodeMeta,
+};
 use tokio::io::{AsyncRead, AsyncWriteExt};
 use tonic::transport::{Channel, Endpoint};
 

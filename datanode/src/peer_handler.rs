@@ -1,4 +1,6 @@
-use proto::generated::datanode_datanode::{CreatePipelineRequest, CreatePipelineResponse, peer_server::Peer};
+use proto::generated::datanode_datanode::{
+    CreatePipelineRequest, CreatePipelineResponse, peer_server::Peer,
+};
 pub struct PeerHandler;
 
 #[tonic::async_trait]

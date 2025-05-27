@@ -2,8 +2,10 @@
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct DataNodeMeta {
     #[prost(string, tag = "1")]
-    pub name: ::prost::alloc::string::String,
+    pub id: ::prost::alloc::string::String,
     #[prost(string, tag = "2")]
+    pub name: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
     pub addrs: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]

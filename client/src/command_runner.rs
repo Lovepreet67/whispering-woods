@@ -1,16 +1,21 @@
 use std::error::Error;
 
 use crate::{
-    chunk_handler::ChunkHandler, file_chunker::{self, FileChunker}, namenode_handler::NamenodeHandler
+    chunk_handler::ChunkHandler,
+    file_chunker::{self, FileChunker},
+    namenode_handler::NamenodeHandler,
 };
 
 pub struct CommandRunner {
     namenode: NamenodeHandler,
-    datanode: ChunkHandler
+    datanode: ChunkHandler,
 }
 impl CommandRunner {
     pub fn new(namenode: NamenodeHandler) -> Self {
-        CommandRunner { namenode ,datanode:ChunkHandler::new()}
+        CommandRunner {
+            namenode,
+            datanode: ChunkHandler::new(),
+        }
     }
     pub async fn handle_input(&mut self, command: &mut str) -> Result<String, Box<dyn Error>> {
         match command {
@@ -77,7 +82,13 @@ return self.handle_delete_file_command(inputs[1].to_owned()).await;
         // send each data node to setup pilepline
         for chunk_detail in &chunk_details {
             let mut read_stream = file_chunker.next_chunk().await?;
-            self.datanode.store_chunk(chunk_detail.id.clone(),chunk_detail.location.clone(),&mut read_stream).await?;
+            self.datanode
+                .store_chunk(
+                    chunk_detail.id.clone(),
+                    chunk_detail.location.clone(),
+                    &mut read_stream,
+                )
+                .await?;
         }
         Ok("File stored successfully".to_owned())
     }

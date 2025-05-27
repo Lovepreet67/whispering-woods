@@ -9,8 +9,9 @@ service ClientNameNode{
 }
 
 message DataNodeMeta {
-  string name =1;
-  string addrs =2;
+  string id =1;
+  string name =2;
+  string addrs =3;
 }
 message ChunkMeta {
   string id = 1;
