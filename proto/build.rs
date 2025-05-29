@@ -10,6 +10,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "client_datanode.proto",
                 "datanode_datanode.proto",
                 "client_namenode.proto",
+                "namenode_datanode.proto",
+                "datanode_namenode.proto",
             ],
             &["."],
         )?;

@@ -8,4 +8,10 @@ pub mod generated {
     pub mod datanode_datanode {
         include!("./generated/datanode_datanode.rs");
     }
+    pub mod datanode_namenode {
+        include!("./generated/datanode_namenode.rs");
+    }
+    pub mod namenode_datanode {
+        include!("./generated/namenode_datanode.rs");
+    }
 }

@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package datanode_namenode;
+
+service DatanodeNamenode {
+  rpc HeartBeat(HeartBeatRequest) returns (HeartBeatResponse);
+}
+message HeartBeatRequest {
+  string datanode_id =1;
+}
+
+message HeartBeatResponse {
+
+}

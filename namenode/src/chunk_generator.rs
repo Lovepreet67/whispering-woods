@@ -17,7 +17,7 @@ impl DefaultChunkGenerator {
 }
 
 impl ChunkGenerator for DefaultChunkGenerator {
-    fn get_chunks(&self, file_size: u64, file_name: &str) -> Vec<ChunkBounderies> {
+    fn get_chunks(&self, file_size: u64, _file_name: &str) -> Vec<ChunkBounderies> {
         let mut curr_offset: u64 = 0;
         let mut chunks: Vec<ChunkBounderies> = vec![];
         while curr_offset < file_size {

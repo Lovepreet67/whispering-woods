@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package namenode_datanode;
+
+service NamenodeDatanode {
+  rpc DeleteChunk(DeleteChunkRequest)returns (DeleteChunkResponse);
+}
+
+message DeleteChunkRequest {
+  string id =1;
+}
+message DeleteChunkResponse {
+  bool available = 1;
+}
