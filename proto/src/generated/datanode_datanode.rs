@@ -3,8 +3,8 @@
 pub struct CreatePipelineRequest {
     #[prost(string, tag = "1")]
     pub chunk_id: ::prost::alloc::string::String,
-    #[prost(string, repeated, tag = "2")]
-    pub replica_set: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    #[prost(message, repeated, tag = "2")]
+    pub replica_set: ::prost::alloc::vec::Vec<super::client_namenode::DataNodeMeta>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CreatePipelineResponse {

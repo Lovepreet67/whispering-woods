@@ -1,9 +1,14 @@
+use datanode_state::DatanodeState;
 use log::info;
 use std::env;
 use std::error::Error;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 pub mod client_handler;
+mod datanode_state;
 pub mod peer_handler;
+mod peer_service;
 pub mod tcp_service;
 use client_handler::ClientHandler;
 use proto::generated::client_datanode::client_data_node_server::ClientDataNodeServer;
@@ -27,8 +32,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
     };
     let addr = format!("127.0.0.1:{}", grpc_port).parse()?;
     info!("Starting the grpc server on address : {addr}");
-    let ch = ClientHandler;
-    let ph = peer_handler::PeerHandler;
+
+    let state = Arc::new(Mutex::new(DatanodeState::new(format!(
+        "127.0.0.1:{}",
+        tcp_port
+    ))));
+
+    let ch = ClientHandler::new(state.clone());
+    let ph = peer_handler::PeerHandler::new(state.clone());
 
     // first we will start grpc server
     let grpc_server = Server::builder()

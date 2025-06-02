@@ -2,13 +2,14 @@ syntax = "proto3";
 
 package datanode_datanode;
 
+import "client_namenode.proto";
 service Peer{
   rpc CreatePipeline(CreatePipelineRequest) returns (CreatePipelineResponse);
 }
 
 message CreatePipelineRequest {
   string chunk_id =1;
-  repeated string replica_set = 2;
+  repeated client_namenode.DataNodeMeta  replica_set = 2;
 }
 message CreatePipelineResponse {
   string address = 1;
