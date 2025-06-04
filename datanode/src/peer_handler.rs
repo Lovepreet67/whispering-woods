@@ -34,7 +34,7 @@ impl Peer for PeerHandler {
         &self,
         request: tonic::Request<CreatePipelineRequest>,
     ) -> Result<tonic::Response<CreatePipelineResponse>, tonic::Status> {
-        let mut create_pipeline_request = request.get_ref();
+        let create_pipeline_request = request.get_ref();
         // first we will send the create pipeling request to the next replica
         if create_pipeline_request.replica_set.len() > 1 {
             let tcp_address = match self

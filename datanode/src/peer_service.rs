@@ -4,7 +4,6 @@ use proto::generated::{
     client_namenode::DataNodeMeta,
     datanode_datanode::{CreatePipelineRequest, peer_client::PeerClient},
 };
-use tokio::net::TcpStream;
 use tonic::transport::{Channel, Endpoint};
 
 pub struct PeerService {}

@@ -15,6 +15,7 @@ use proto::generated::client_datanode::client_data_node_server::ClientDataNodeSe
 use proto::generated::datanode_datanode::peer_server::PeerServer;
 use storage::file_storage;
 use tonic::transport::Server;
+mod tcp_stream_tee;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -48,9 +49,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .serve(addr);
     tokio::spawn(grpc_server);
     // we will create storage which will be used by the tcp service to serve a file
-    let store = file_storage::FileStorage::new("./temp".to_owned());
+    let store = file_storage::FileStorage::new(format!("./temp/{}", grpc_port));
     info!("Starting the tcp server on grpc port: {}", tcp_port);
-    let tcp_handler = tcp_service::TCPService::new(tcp_port, store).await?;
+    let tcp_handler = tcp_service::TCPService::new(tcp_port, store, state.clone()).await?;
     tcp_handler.start_and_accept().await?;
     info!("Server s address : {addr}");
     Ok(())

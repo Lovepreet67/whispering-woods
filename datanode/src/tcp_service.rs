@@ -1,28 +1,44 @@
 use log::{error, info};
-use std::{error::Error, u64};
+use std::{error::Error, sync::Arc, u64};
 use storage::{file_storage::FileStorage, storage::Storage};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt, copy},
     net::{TcpListener, TcpStream},
+    sync::Mutex,
+};
+
+use crate::{
+    datanode_state::{self, DatanodeState},
+    tcp_stream_tee::{self, tee_tcp_stream},
 };
 
 pub struct TCPService {
     listener: TcpListener,
     store: FileStorage,
+    state: Arc<Mutex<DatanodeState>>,
 }
 
 impl TCPService {
-    pub async fn new(port: String, store: FileStorage) -> Result<Self, Box<dyn Error>> {
+    pub async fn new(
+        port: String,
+        store: FileStorage,
+        state: Arc<Mutex<DatanodeState>>,
+    ) -> Result<Self, Box<dyn Error>> {
         let address = format!("127.0.0.1:{}", port).to_owned();
         let listener = TcpListener::bind(address).await?;
-        Ok(TCPService { listener, store })
+        Ok(TCPService {
+            listener,
+            store,
+            state,
+        })
     }
     pub async fn start_and_accept(&self) -> Result<(), Box<dyn Error>> {
         loop {
             let (tcp_stream, _) = self.listener.accept().await?;
             let store = self.store.clone();
+            let state = self.state.clone();
             tokio::spawn(async move {
-                if let Err(e) = Self::handle_connection(tcp_stream, store).await {
+                if let Err(e) = Self::handle_connection(tcp_stream, store, state).await {
                     error!("error while handling the tcp connection {e}");
                 }
             });
@@ -31,6 +47,7 @@ impl TCPService {
     async fn handle_connection(
         mut tcp_stream: TcpStream,
         store: FileStorage,
+        state: Arc<Mutex<DatanodeState>>,
     ) -> Result<(), Box<dyn Error>> {
         // first we will fetch the chunk_id
         let mut chunk_id_bytes = [0u8; 16];
@@ -45,7 +62,15 @@ impl TCPService {
         if mode == 1 {
             info!("accepted request for chunk id {} for write mode", chunk_id);
             // read a file from the
-            store.write(chunk_id, &mut tcp_stream).await?;
+            // after reading the chunk_id and mode  we will post that details to the pipeline
+            let (mut stream1, mut stream2) = tee_tcp_stream(tcp_stream);
+            store.write(chunk_id.clone(), &mut stream1).await?;
+            let mut curr_state = state.lock().await;
+            if let Some(mut pipeline) = curr_state.chunk_to_pipline.remove(&chunk_id) {
+                pipeline.write_all(&chunk_id_bytes).await?;
+                pipeline.write_all(&[mode]).await?;
+                copy(&mut stream2, &mut pipeline).await?;
+            }
         } else if mode == 2 {
             info!("accepted request for chunk id {} for read mode", chunk_id);
             //if file is already present just delete it (for future)
