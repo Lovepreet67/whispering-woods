@@ -58,7 +58,7 @@ impl Storage for FileStorage {
         Ok(chunk_ids)
     }
     async fn available_storage(&self) -> usize {
-        10_usize
+        10737418240_usize
     }
 }
 

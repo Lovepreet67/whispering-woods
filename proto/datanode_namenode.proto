@@ -3,12 +3,32 @@ syntax = "proto3";
 package datanode_namenode;
 
 service DatanodeNamenode {
+  rpc Connection(ConnectionRequest) returns (ConnectionResponse); // as connect name is already taken
   rpc HeartBeat(HeartBeatRequest) returns (HeartBeatResponse);
+  rpc StateSync(StateSyncRequest) returns (StateSyncResponse);
+}
+
+message ConnectionRequest{
+  string id =1;
+  string addrs=2;
+  string name =3;
+}
+message ConnectionResponse{
+  bool connected=1;
+  string msg= 2;
+}
+message StateSyncRequest{
+  string id =1;
+  uint64 availabe_storage=2;
+  repeated string available_chunks=3;
+}
+message StateSyncResponse{
+
 }
 message HeartBeatRequest {
   string datanode_id =1;
 }
 
 message HeartBeatResponse {
-
+  bool connection_alive=1;
 }

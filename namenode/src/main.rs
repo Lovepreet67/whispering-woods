@@ -2,6 +2,7 @@ use std::{env, error::Error, sync::Arc};
 
 use client_handler::ClientHandler;
 use datanode_handler::DatanodeHandler;
+use log::info;
 use namenode_state::NamenodeState;
 use proto::generated::{
     client_namenode::client_name_node_server::ClientNameNodeServer,
@@ -22,6 +23,7 @@ mod state_mantainer;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    env_logger::init();
     let args: Vec<String> = env::args().collect();
     let grpc_port = if args.len() > 1 {
         args[1].clone()
@@ -29,7 +31,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         "3000".to_owned()
     };
     let addr = format!("127.0.0.1:{}", grpc_port).parse()?;
-    println!("Starting the grpc server on address : {addr}");
+    info!("Starting the grpc server on address : {addr}");
 
     let state = Arc::new(Mutex::new(NamenodeState::default()));
     let state_mantainer = StateMantainer::new(state.clone());

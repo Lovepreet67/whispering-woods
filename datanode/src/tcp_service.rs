@@ -1,5 +1,5 @@
-use log::{error, info};
-use std::{error::Error, sync::Arc, u64};
+use log::{error, info, trace};
+use std::{error::Error, sync::Arc};
 use storage::{file_storage::FileStorage, storage::Storage};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt, copy},
@@ -60,7 +60,7 @@ impl TCPService {
             .read_exact(std::slice::from_mut(&mut mode))
             .await?;
         if mode == 1 {
-            info!("accepted request for chunk id {} for write mode", chunk_id);
+            trace!("accepted request for chunk id {} for write mode", chunk_id);
             // read a file from the
             // after reading the chunk_id and mode  we will post that details to the pipeline
             let (mut stream1, mut stream2) = tee_tcp_stream(tcp_stream);
@@ -72,7 +72,7 @@ impl TCPService {
                 copy(&mut stream2, &mut pipeline).await?;
             }
         } else if mode == 2 {
-            info!("accepted request for chunk id {} for read mode", chunk_id);
+            trace!("accepted request for chunk id {} for read mode", chunk_id);
             //if file is already present just delete it (for future)
             let reader = store.read(chunk_id).await?;
             copy(&mut reader.take(u64::MAX), &mut tcp_stream).await?;
