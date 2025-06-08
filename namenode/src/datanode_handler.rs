@@ -29,7 +29,7 @@ impl DatanodeNamenode for DatanodeHandler {
         request: tonic::Request<HeartBeatRequest>,
     ) -> Result<tonic::Response<HeartBeatResponse>, tonic::Status> {
         let heart_beat_request = request.into_inner();
-        trace!("got heartbeat request {:?}", heart_beat_request);
+        //trace!("got heartbeat request {:?}", heart_beat_request);
         let mut state = self.state.lock().await;
         let response = if state
             .datanode_to_meta_map
@@ -53,10 +53,10 @@ impl DatanodeNamenode for DatanodeHandler {
         request: tonic::Request<ConnectionRequest>,
     ) -> Result<tonic::Response<ConnectionResponse>, tonic::Status> {
         let connection_request = request.into_inner();
-        trace!(
+        /*trace!(
             "got connection request from data node {}",
             connection_request.id
-        );
+        );*/
         let mut state = self.state.lock().await;
         // if the connection already exist for this we will not accept connection
         let response = if state

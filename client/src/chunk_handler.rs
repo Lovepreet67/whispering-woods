@@ -52,7 +52,6 @@ impl ChunkHandler {
             .store_chunk(tonic::Request::new(store_chunk_request))
             .await?;
         let tcp_addrs = &store_chunk_response.get_ref().address;
-
         // connect to tcp stream and push data as [chunk_id,write_mode,bytes from stream]
         let mut tcp_stream = self.get_tcp_connection(tcp_addrs).await?;
         tcp_stream.write_all(chunk_id.as_bytes()).await?;

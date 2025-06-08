@@ -1,9 +1,9 @@
 use std::error::Error;
 
+use log::{debug, info};
+
 use crate::{
-    chunk_handler::ChunkHandler,
-    file_chunker::{self, FileChunker},
-    namenode_handler::NamenodeHandler,
+    chunk_handler::ChunkHandler, file_chunker::FileChunker, namenode_handler::NamenodeHandler,
 };
 
 pub struct CommandRunner {
@@ -73,11 +73,12 @@ return self.handle_delete_file_command(inputs[1].to_owned()).await;
             return Err(format!("Provided file path ({}) is dir", local_file_path).into());
         }
         // request namenode for chunk details
-        println!("file size : {}", file_metadata.len());
+        info!("file size : {}", file_metadata.len());
         let chunk_details = self
             .namenode
             .store_file(remote_file_name, file_metadata.len())
             .await?;
+        //debug!("got namenode response : {:?}",chunk_details);
         let mut file_chunker = FileChunker::new(local_file_path.clone(), &chunk_details);
         // send each data node to setup pilepline
         for chunk_detail in &chunk_details {
@@ -97,6 +98,21 @@ return self.handle_delete_file_command(inputs[1].to_owned()).await;
         remote_file_name: String,
         local_file_name: String,
     ) -> Result<String, Box<dyn Error>> {
+        debug!("fetching the file {remote_file_name}");
+        let chunk_details = self.namenode.fetch_file(remote_file_name).await?;
+        debug!("got chunk details for remote file {:?}", chunk_details);
+        // send each data node to setup pilepline
+        //for chunk_detail in &chunk_details {
+        //    //debug!("working on chunk : {:?}",chunk_details);
+        //    println!("working on chunk : {:?}", chunk_details);
+        //    self.datanode
+        //        .fetch_chunk(
+        //            chunk_detail.id.clone(),
+        //            //chunk_detail.location[0].clone()
+        //        )
+        //        .await?;
+        //}
+
         Ok("File fetched successfully".to_owned())
     }
     async fn handle_delete_file_command(

@@ -7,12 +7,12 @@ use proto::generated::client_namenode::DataNodeMeta;
 
 use crate::data_structure::ChunkBounderies;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct DatanodeState {
     pub storage_remaining: u64,
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct NamenodeState {
     pub file_to_chunk_map: HashMap<String, Vec<String>>,
     pub chunk_to_location_map: HashMap<String, Vec<String>>,

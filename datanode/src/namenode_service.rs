@@ -1,6 +1,6 @@
 use std::{error::Error, str::FromStr, sync::Arc, time::Duration};
 
-use log::info;
+use log::{info, trace};
 use proto::generated::datanode_namenode::{
     ConnectionRequest, HeartBeatRequest, HeartBeatResponse, StateSyncRequest,
     datanode_namenode_client::DatanodeNamenodeClient, datanode_namenode_server::DatanodeNamenode,
@@ -73,7 +73,7 @@ impl NamenodeService {
     pub async fn state_sync(&self) -> Result<(), Box<dyn Error>> {
         let state = self.state.lock().await;
         let namenode_addrs = state.namenode_addrs.clone();
-        info!("sending state sync with {:?}", state);
+        trace!("sending state sync with {:?}", state);
         let state_sync_request = StateSyncRequest {
             id: state.get_id(),
             available_chunks: state.available_chunks.clone(),

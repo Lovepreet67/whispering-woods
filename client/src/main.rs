@@ -9,6 +9,7 @@ mod file_chunker;
 mod namenode_handler;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    env_logger::init();
     let namenode_addrs = std::env::args()
         .nth(1)
         .expect("Please provide Name Node address.");

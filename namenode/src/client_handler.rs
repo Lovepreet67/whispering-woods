@@ -1,5 +1,6 @@
 use std::{sync::Arc, vec};
 
+use log::debug;
 use proto::generated::client_namenode::{
     ChunkMeta, DeleteFileRequest, DeleteFileResponse, FetchFileRequest, FetchFileResponse,
     StoreFileRequest, StoreFileResponse, client_name_node_server::ClientNameNode,
@@ -9,6 +10,7 @@ use tonic::Code;
 
 use crate::{
     chunk_generator::{ChunkGenerator, DefaultChunkGenerator},
+    data_structure::ChunkBounderies,
     datanode_selection_policy::{DatanodeSelectionPolicy, DefaultDatanodeSelectionPolicy},
     datanode_service::DatanodeService,
     namenode_state::NamenodeState,
@@ -57,6 +59,24 @@ impl ClientNameNode for ClientHandler {
                 location,
             });
         }
+        // add this detail to namenode meta
+        let mut state = self.state.lock().await;
+        state.file_to_chunk_map.insert(
+            store_file_request.file_name.clone(),
+            chunk_meta.iter().map(|chunk| chunk.id.clone()).collect(),
+        );
+        // inserting the chunk boundary detail in state
+        chunk_meta.iter().for_each(|chunk| {
+            state.chunk_to_boundry_map.insert(
+                chunk.id.clone(),
+                ChunkBounderies {
+                    chunk_id: chunk.id.clone(),
+                    start_offset: chunk.start_offset,
+                    end_offset: chunk.end_offset,
+                },
+            );
+        });
+
         let store_file_response = StoreFileResponse {
             file_name: store_file_request.file_name.clone(),
             chunk_list: chunk_meta,
@@ -68,16 +88,26 @@ impl ClientNameNode for ClientHandler {
         request: tonic::Request<FetchFileRequest>,
     ) -> Result<tonic::Response<FetchFileResponse>, tonic::Status> {
         let fetch_file_request = request.get_ref();
-        let state = self.state.lock().await;
+        debug!(
+            "got request to fetch file : {}",
+            fetch_file_request.file_name
+        );
+        //TODO: find something better than cloning state
+        //if we don't clone here this becomes deadlock when we can function get_datanodes_to_serve
+        //which also uses state may be reader writer locak will help
+        let state = self.state.lock().await.clone();
         if let Some(chunks) = state.file_to_chunk_map.get(&fetch_file_request.file_name) {
+            debug!("found file");
             let mut chunk_list: Vec<ChunkMeta> = vec![];
             for chunk in chunks {
+                debug!("working on chunk {:?}", chunk);
                 let location = match self.datanode_selector.get_datanodes_to_serve(chunk).await {
                     Ok(location) => location,
                     Err(e) => {
                         return Err(tonic::Status::not_found(format!("{}", e)));
                     }
                 };
+                debug!("we got locations that will serve {:?}", location);
                 let chunk_boundery = match state.chunk_to_boundry_map.get(chunk) {
                     Some(v) => v,
                     None => {

@@ -1,6 +1,7 @@
 use std::error::Error;
 use std::sync::Arc;
 
+use log::debug;
 use proto::generated::client_datanode::client_data_node_server::ClientDataNode;
 use proto::generated::client_datanode::{
     EchoRequest, EchoResponse, StoreChunkRequest, StoreChunkResponse,
@@ -50,6 +51,7 @@ impl ClientDataNode for ClientHandler {
         let mut store_request = request.get_ref();
         // first we will send the create pipeling request to the next replica
         if store_request.replica_set.len() > 1 {
+            debug!("replica set is >1 so we are creating piplines");
             let tcp_address = match self
                 .peer_service
                 .create_pipeline(&store_request.chunk_id, &store_request.replica_set[1..])
@@ -63,6 +65,7 @@ impl ClientDataNode for ClientHandler {
                     )));
                 }
             };
+            debug!("Got the pipeline address {tcp_address}");
             let tcp_connection = match self.get_tcp_connection(&tcp_address).await {
                 Ok(connection) => connection,
                 Err(e) => {
@@ -76,6 +79,10 @@ impl ClientDataNode for ClientHandler {
             state
                 .chunk_to_pipline
                 .insert(store_request.chunk_id.clone(), tcp_connection);
+            debug!(
+                "successfully established the tcp connection and stored in chunk to pipeline {:?}",
+                state.chunk_to_pipline
+            );
         }
         let response = StoreChunkResponse {
             address: self.state.lock().await.tcp_server_addrs.clone(),
