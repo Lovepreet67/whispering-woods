@@ -1,8 +1,8 @@
 use std::{sync::Arc, time::Duration};
 
-use log::{error, info};
 use storage::{file_storage::FileStorage, storage::Storage};
 use tokio::{sync::Mutex, time::interval};
+use utilities::logger::{error, info};
 
 use crate::datanode_state::DatanodeState;
 

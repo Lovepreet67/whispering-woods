@@ -1,5 +1,4 @@
 use core::str;
-use log::{debug, error, info, trace};
 use std::{error::Error, sync::Arc};
 use storage::{file_storage::FileStorage, storage::Storage};
 use tokio::{
@@ -7,6 +6,7 @@ use tokio::{
     net::{TcpListener, TcpStream},
     sync::Mutex,
 };
+use utilities::logger::{debug, error, info, trace};
 
 use crate::{datanode_state::DatanodeState, tcp_stream_tee::tee_tcp_stream};
 

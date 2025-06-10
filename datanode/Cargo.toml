@@ -6,8 +6,7 @@ edition = "2024"
 [dependencies]
 storage = {path="../storage"}
 proto = {path="../proto"}
+utilities = {path="../utilities"}
 tonic = "0.13.1"
 tokio = { version = "1.45.0", features = ["full"] }
 
-log = { version = "0.4.27", features = ["std", "serde"] }
-env_logger = "0.11.8"

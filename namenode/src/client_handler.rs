@@ -1,12 +1,12 @@
 use std::{sync::Arc, vec};
 
-use log::debug;
 use proto::generated::client_namenode::{
     ChunkMeta, DeleteFileRequest, DeleteFileResponse, FetchFileRequest, FetchFileResponse,
     StoreFileRequest, StoreFileResponse, client_name_node_server::ClientNameNode,
 };
 use tokio::sync::Mutex;
 use tonic::Code;
+use utilities::logger::debug;
 
 use crate::{
     chunk_generator::{ChunkGenerator, DefaultChunkGenerator},

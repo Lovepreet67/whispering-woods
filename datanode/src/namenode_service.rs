@@ -1,12 +1,12 @@
 use std::{error::Error, str::FromStr, sync::Arc, time::Duration};
 
-use log::{info, trace};
 use proto::generated::datanode_namenode::{
     ConnectionRequest, HeartBeatRequest, HeartBeatResponse, StateSyncRequest,
     datanode_namenode_client::DatanodeNamenodeClient, datanode_namenode_server::DatanodeNamenode,
 };
 use tokio::sync::Mutex;
 use tonic::transport::{Channel, Endpoint};
+use utilities::logger::{info, trace};
 
 use crate::datanode_state::DatanodeState;
 

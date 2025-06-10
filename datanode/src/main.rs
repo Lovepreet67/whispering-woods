@@ -1,5 +1,4 @@
 use datanode_state::DatanodeState;
-use log::{error, info, trace};
 use namenode_service::NamenodeService;
 use state_mantainer::StateMantainer;
 use std::env;
@@ -8,6 +7,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
 use tokio::time::sleep;
+use utilities::logger::{error, info, init_logger, trace};
 
 pub mod client_handler;
 mod datanode_state;
@@ -25,7 +25,6 @@ mod tcp_stream_tee;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    env_logger::init();
     let args: Vec<String> = env::args().collect();
     let grpc_port = if args.len() > 1 {
         args[1].clone()
@@ -43,6 +42,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         // defaut namenode address
         "http://127.0.0.1:7000".to_owned()
     };
+    let _gaurd = init_logger("Datanode", &grpc_port);
     let addr = format!("127.0.0.1:{}", grpc_port).parse()?;
     info!("Starting the grpc server on address : {addr}");
     let state = Arc::new(Mutex::new(DatanodeState::new(

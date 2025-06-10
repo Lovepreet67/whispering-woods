@@ -1,0 +1,16 @@
+filebeat.inputs:
+  - type: log
+    enabled: true
+    paths:
+      - /host/Users/lovepreetsingh/Library/Logs/whispiring_woods/**/*.log
+    json.keys_under_root: true
+    json.add_error_key: true
+output.elasticsearch:
+  hosts: ["http://elasticsearch:9200"]
+  username: "elastic"
+  password: ""  # Leave blank if xpack security is disabled
+
+setup.kibana:
+  host: "http://kibana:5601"
+
+setup.ilm.enabled: false

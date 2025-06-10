@@ -1,13 +1,13 @@
 use std::error::Error;
 use std::sync::Arc;
 
-use log::debug;
 use proto::generated::client_datanode::client_data_node_server::ClientDataNode;
 use proto::generated::client_datanode::{
     EchoRequest, EchoResponse, StoreChunkRequest, StoreChunkResponse,
 };
 use tokio::net::TcpStream;
 use tokio::sync::Mutex;
+use utilities::logger::debug;
 
 use crate::datanode_state::DatanodeState;
 use crate::peer_service::PeerService;

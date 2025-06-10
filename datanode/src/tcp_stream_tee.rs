@@ -1,8 +1,8 @@
-use log::debug;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt, DuplexStream, duplex},
     net::TcpStream,
 };
+use utilities::logger::debug;
 
 pub fn tee_tcp_stream(mut tcp_stream: TcpStream) -> (DuplexStream, DuplexStream) {
     let (mut tx1, rx1) = duplex(8192); // 8192 is 8kb

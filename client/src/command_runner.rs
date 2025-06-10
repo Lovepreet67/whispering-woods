@@ -1,10 +1,8 @@
-use std::error::Error;
-
-use log::{debug, info};
-
 use crate::{
     chunk_handler::ChunkHandler, file_chunker::FileChunker, namenode_handler::NamenodeHandler,
 };
+use std::error::Error;
+use utilities::logger::{debug, info};
 
 pub struct CommandRunner {
     namenode: NamenodeHandler,
