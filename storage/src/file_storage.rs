@@ -2,6 +2,7 @@ use std::{
     error::Error,
     path::{Path, PathBuf},
 };
+use tracing::{debug, error};
 
 use crate::storage::Storage;
 use tokio::{
@@ -40,9 +41,19 @@ impl Storage for FileStorage {
         let chunk_file = File::open(chunk_path).await?;
         Ok(Box::new(chunk_file))
     }
-    async fn delete(&self, chunk_id: String) -> Result<(), Box<dyn Error>> {
-        fs::remove_file(self.get_path(&chunk_id)).await?;
-        Ok(())
+    async fn delete(&self, chunk_id: String) -> Result<bool, Box<dyn Error>> {
+        debug!(%chunk_id,"inside storage : got delete request for ");
+        let exists = match fs::try_exists(self.get_path(&chunk_id)).await {
+            Ok(v) => v,
+            Err(e) => {
+                error!("error while checking if chunk exist e : {}", e);
+                false
+            }
+        };
+        if exists {
+            fs::remove_file(self.get_path(&chunk_id)).await?;
+        }
+        Ok(exists)
     }
     async fn available_chunks(&self) -> Result<Vec<String>, Box<dyn Error>> {
         let mut dir_enteries = fs::read_dir(&self.root).await?;

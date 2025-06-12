@@ -1,13 +1,15 @@
 use std::{error::Error, str::FromStr, time::Duration};
 
 use proto::generated::{
-    client_datanode::{client_data_node_client::ClientDataNodeClient, FetchChunkRequest, StoreChunkRequest},
+    client_datanode::{
+        FetchChunkRequest, StoreChunkRequest, client_data_node_client::ClientDataNodeClient,
+    },
     client_namenode::DataNodeMeta,
 };
 use tokio::io::{AsyncRead, AsyncWriteExt};
 use tonic::transport::{Channel, Endpoint};
-use utilities::logger::{instrument, trace};
 use utilities::logger::tracing;
+use utilities::logger::{instrument, trace};
 
 #[derive(Debug)]
 pub struct ChunkHandler {}
@@ -19,7 +21,7 @@ impl ChunkHandler {
         &self,
         addrs: &str,
     ) -> Result<ClientDataNodeClient<Channel>, Box<dyn Error>> {
-        trace!("Getting grpc connection addrs : {}",addrs);
+        trace!("Getting grpc connection addrs : {}", addrs);
         let endpoint = Endpoint::from_str(addrs)
             .map_err(|e| format!("Error while creating an endpoint {}", e))?
             .connect_timeout(Duration::from_secs(5));
@@ -33,7 +35,7 @@ impl ChunkHandler {
         &self,
         addrs: &str,
     ) -> Result<tokio::net::TcpStream, Box<dyn Error>> {
-        trace!("Establishing tcp connection to {}",addrs);
+        trace!("Establishing tcp connection to {}", addrs);
         tokio::net::TcpStream::connect(addrs)
             .await
             .map_err(|e| format!("Error while connecting to stream at {:?} {:?}", addrs, e).into())
@@ -75,7 +77,7 @@ impl ChunkHandler {
         chunk_id: String,
         datanode_addrs: String,
     ) -> Result<impl AsyncRead + Unpin, Box<dyn Error>> {
-        let fetch_chunk_request = FetchChunkRequest{
+        let fetch_chunk_request = FetchChunkRequest {
             chunk_id: chunk_id.clone(),
         };
         let mut data_node_grpc_client = self.get_grpc_connection(&datanode_addrs).await?;
@@ -83,8 +85,11 @@ impl ChunkHandler {
         trace!("Sending fetch chunk request");
         let fetch_chunk_response = data_node_grpc_client
             .fetch_chunk(tonic::Request::new(fetch_chunk_request))
-            .await?.into_inner();
-        let mut tcp_stream = self.get_tcp_connection(&fetch_chunk_response.address).await?;
+            .await?
+            .into_inner();
+        let mut tcp_stream = self
+            .get_tcp_connection(&fetch_chunk_response.address)
+            .await?;
         trace!("writing chunk id");
         tcp_stream.write_all(chunk_id.as_bytes()).await?;
         // we will send the mode as read mode

@@ -2,8 +2,8 @@ use crate::{
     chunk_handler::ChunkHandler, file_chunker::FileChunker, namenode_handler::NamenodeHandler,
 };
 use std::{collections::HashMap, error::Error};
-use tokio::io::{copy, AsyncWriteExt};
-use utilities::logger::{debug, info,error, span, trace, tracing::Level};
+use tokio::io::{AsyncWriteExt, copy};
+use utilities::logger::{debug, error, info, span, trace, tracing::Level};
 
 pub struct CommandRunner {
     namenode: NamenodeHandler,
@@ -85,18 +85,19 @@ return self.handle_delete_file_command(inputs[1].to_owned()).await;
         for chunk_detail in &chunk_details {
             span!(Level::TRACE ,"working on chunk",chunk_id = %chunk_detail.id);
             let mut read_stream = file_chunker.next_chunk().await?;
-           let res =  self.datanode
+            let res = self
+                .datanode
                 .store_chunk(
                     chunk_detail.id.clone(),
                     chunk_detail.location.clone(),
                     &mut read_stream,
                 )
                 .await;
-            match  res {
-               Ok(_)=>{},
-               Err(e)=>{
-                   error!("{}",e);
-               }
+            match res {
+                Ok(_) => {}
+                Err(e) => {
+                    error!("{}", e);
+                }
             }
         }
         Ok("File stored successfully".to_owned())
@@ -113,23 +114,32 @@ return self.handle_delete_file_command(inputs[1].to_owned()).await;
         debug!("got chunk details for remote file {:?}", chunk_details);
         //let mut chunk_to_read_stream_map = HashMap::new();
         // now we will open a write stream to the target file
-        let mut target_file = tokio::fs::File::options().append(true).create(true).open(local_file_name).await?;
+        let mut target_file = tokio::fs::File::options()
+            .append(true)
+            .create(true)
+            .open(local_file_name)
+            .await?;
         trace!("opened file in append only mode");
-        for chunk_detail in &chunk_details{
+        for chunk_detail in &chunk_details {
             span!(Level::TRACE ,"working on chunk",chunk_id = %chunk_detail.id);
             let fetch_chunk_result = {
-                self.datanode.fetch_chunk(
-                chunk_detail.id.clone(),chunk_detail.location[0].addrs.clone()).await };
-             match fetch_chunk_result{
-               Ok(mut read_stream)=>{
-                   //chunk_to_read_stream_map.insert(chunk_detail.id.clone(), read_stream);
-                   copy(&mut read_stream,&mut target_file).await?;
-               }
-               Err(e)=>{
-                   error!(error = %e,"Error during chunk fetching");
-                   return Err(e);
-               }
-           } 
+                self.datanode
+                    .fetch_chunk(
+                        chunk_detail.id.clone(),
+                        chunk_detail.location[0].addrs.clone(),
+                    )
+                    .await
+            };
+            match fetch_chunk_result {
+                Ok(mut read_stream) => {
+                    //chunk_to_read_stream_map.insert(chunk_detail.id.clone(), read_stream);
+                    copy(&mut read_stream, &mut target_file).await?;
+                }
+                Err(e) => {
+                    error!(error = %e,"Error during chunk fetching");
+                    return Err(e);
+                }
+            }
         }
         Ok("File fetched successfully".to_owned())
     }
@@ -137,6 +147,11 @@ return self.handle_delete_file_command(inputs[1].to_owned()).await;
         &mut self,
         remote_file_name: String,
     ) -> Result<String, Box<dyn Error>> {
+        trace!("sending a delete file request to the namenode");
+        let delete_node = self.namenode.delete_file(remote_file_name).await?;
+        if !delete_node {
+            return Ok("File was not present".to_owned());
+        }
         Ok("File deleted successfully".to_owned())
     }
 }

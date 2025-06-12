@@ -3,7 +3,8 @@ use std::sync::Arc;
 
 use proto::generated::client_datanode::client_data_node_server::ClientDataNode;
 use proto::generated::client_datanode::{
-    EchoRequest, EchoResponse, FetchChunkRequest, FetchChunkResponse, StoreChunkRequest, StoreChunkResponse
+    EchoRequest, EchoResponse, FetchChunkRequest, FetchChunkResponse, StoreChunkRequest,
+    StoreChunkResponse,
 };
 use tokio::net::TcpStream;
 use tokio::sync::Mutex;
@@ -89,16 +90,25 @@ impl ClientDataNode for ClientHandler {
         };
         Ok(tonic::Response::new(response))
     }
-    async fn fetch_chunk(&self,request:tonic::Request<FetchChunkRequest>)->Result<tonic::Response<FetchChunkResponse>,tonic::Status>{
+    async fn fetch_chunk(
+        &self,
+        request: tonic::Request<FetchChunkRequest>,
+    ) -> Result<tonic::Response<FetchChunkResponse>, tonic::Status> {
         let fetch_chunk_request = request.into_inner();
         trace!(chunk_id = %fetch_chunk_request.chunk_id,"got fetch chunk request");
         let state = self.state.lock().await;
-        if !state.available_chunks.contains(&fetch_chunk_request.chunk_id){
+        if !state
+            .available_chunks
+            .contains(&fetch_chunk_request.chunk_id)
+        {
             trace!(available_chunks = ?state.available_chunks,"chunk not available");
-             return Err(tonic::Status::new(tonic::Code::NotFound, format!("chunk {} not available",fetch_chunk_request.chunk_id)));
+            return Err(tonic::Status::new(
+                tonic::Code::NotFound,
+                format!("chunk {} not available", fetch_chunk_request.chunk_id),
+            ));
         }
-        let fetch_chunk_response = FetchChunkResponse{
-            address : state.tcp_server_addrs.clone()
+        let fetch_chunk_response = FetchChunkResponse {
+            address: state.tcp_server_addrs.clone(),
         };
         Ok(tonic::Response::new(fetch_chunk_response))
     }

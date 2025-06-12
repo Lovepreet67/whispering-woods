@@ -1,5 +1,7 @@
 use datanode_state::DatanodeState;
+use namenode_handler::NamenodeHandler;
 use namenode_service::NamenodeService;
+use proto::generated::namenode_datanode::namenode_datanode_server::NamenodeDatanodeServer;
 use state_mantainer::StateMantainer;
 use std::env;
 use std::error::Error;
@@ -20,6 +22,7 @@ use proto::generated::client_datanode::client_data_node_server::ClientDataNodeSe
 use proto::generated::datanode_datanode::peer_server::PeerServer;
 use storage::file_storage;
 use tonic::transport::Server;
+mod namenode_handler;
 mod namenode_service;
 mod tcp_stream_tee;
 
@@ -54,13 +57,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let ch = ClientHandler::new(state.clone());
     let ph = peer_handler::PeerHandler::new(state.clone());
     // first we will start grpc server
+    let store = file_storage::FileStorage::new(format!("./temp/{}", grpc_port));
     let grpc_server = Server::builder()
         .add_service(ClientDataNodeServer::new(ch))
         .add_service(PeerServer::new(ph))
+        .add_service(NamenodeDatanodeServer::new(NamenodeHandler::new(
+            store.clone(),
+        )))
         .serve(addr);
     tokio::spawn(grpc_server);
     // we will create storage which will be used by the tcp service to serve a file
-    let store = file_storage::FileStorage::new(format!("./temp/{}", grpc_port));
     info!("Starting the tcp server on grpc port: {}", tcp_port);
     let tcp_handler = tcp_service::TCPService::new(tcp_port, store.clone(), state.clone()).await?;
     tokio::spawn(async move {

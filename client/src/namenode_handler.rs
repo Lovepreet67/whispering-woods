@@ -5,6 +5,7 @@ use proto::generated::client_namenode::{
     client_name_node_client::ClientNameNodeClient,
 };
 use tonic::transport::{Channel, Endpoint};
+use utilities::logger::debug;
 
 pub struct NamenodeHandler {
     address: String,
@@ -79,6 +80,7 @@ impl NamenodeHandler {
         Ok(fetch_file_response.chunk_list.clone())
     }
     pub async fn delete_file(&mut self, file_name: String) -> Result<bool, Box<dyn Error>> {
+        debug!("delete file for #{}#", file_name);
         let delete_file_request = DeleteFileRequest {
             file_name: file_name.clone(),
         };

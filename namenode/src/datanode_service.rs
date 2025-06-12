@@ -4,6 +4,7 @@ use proto::generated::namenode_datanode::{
     DeleteChunkRequest, namenode_datanode_client::NamenodeDatanodeClient,
 };
 use tonic::transport::{Channel, Endpoint};
+use utilities::logger::debug;
 
 #[derive(Clone, Copy)]
 pub struct DatanodeService {}
@@ -30,6 +31,7 @@ impl DatanodeService {
         datanode_addrs: &str,
         chunk_id: &str,
     ) -> Result<bool, Box<dyn Error + Send + Sync>> {
+        debug!("got delete request");
         let request = DeleteChunkRequest {
             id: chunk_id.to_owned(),
         };

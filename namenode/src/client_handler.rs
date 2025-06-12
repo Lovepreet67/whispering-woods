@@ -6,7 +6,7 @@ use proto::generated::client_namenode::{
 };
 use tokio::sync::Mutex;
 use tonic::Code;
-use utilities::logger::debug;
+use utilities::logger::{debug, error};
 
 use crate::{
     chunk_generator::{ChunkGenerator, DefaultChunkGenerator},
@@ -138,22 +138,35 @@ impl ClientNameNode for ClientHandler {
     ) -> Result<tonic::Response<DeleteFileResponse>, tonic::Status> {
         let delete_file_request = request.get_ref();
         let mut state = self.state.lock().await;
-        let chunks = match state.file_to_chunk_map.get(&delete_file_request.file_name) {
+        let chunks = match state
+            .file_to_chunk_map
+            .remove(&delete_file_request.file_name)
+        {
             Some(v) => v.clone(),
             None => {
                 let delete_file_response = DeleteFileResponse { file_present: true };
                 return Ok(tonic::Response::new(delete_file_response));
             }
         };
+        debug!(?chunks, "got chunks ");
         for chunk in &chunks {
             if let Some(location) = state.chunk_to_location_map.get(chunk) {
                 for datanode_id in location {
+                    debug!(?datanode_id, ?chunk, "deleting on this location ");
                     if let Some(datanode_meta) = state.datanode_to_meta_map.get(datanode_id) {
                         let datanode_service = self.datanode_service;
                         let addrs = datanode_meta.addrs.clone();
                         let chunk = chunk.clone();
                         tokio::spawn(async move {
-                            let _ = datanode_service.delete_chunk(&addrs, &chunk).await;
+                            let _ = datanode_service.clone().delete_chunk(&addrs, &chunk).await;
+                            //{
+                            //Ok(v)=>{
+                            //    debug!(?datanode_id,?chunk,"deletion done")
+                            //}
+                            //Err(e)=>{
+                            //    error!(%e,"error while deleting chunk from datanode")
+                            //}
+                            //}
                         });
                     }
                 }
