@@ -6,7 +6,8 @@ use tracing_appender::{
 use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
 // exporing the info! warn! etc tracing macro through this Library
-pub use tracing::{debug, error, info, trace, warn};
+pub use tracing::{debug, error, info, trace, warn,span,instrument};
+pub use tracing;
 
 pub fn init_logger(service_name: &str, node_id: &str) -> WorkerGuard {
     let file_appender = RollingFileAppender::new(

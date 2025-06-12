@@ -22,7 +22,6 @@ until curl -s http://localhost:9200 >/dev/null; do
     sleep 1
 done
 echo "Elasticsearch is ready."
-
 # Run NameNode (port 7000)
 echo "Starting NameNode..."
 cargo run -p namenode -- 7000 >/dev/null 2>&1 < /dev/null &

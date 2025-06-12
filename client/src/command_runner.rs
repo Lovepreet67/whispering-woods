@@ -1,8 +1,9 @@
 use crate::{
     chunk_handler::ChunkHandler, file_chunker::FileChunker, namenode_handler::NamenodeHandler,
 };
-use std::error::Error;
-use utilities::logger::{debug, info};
+use std::{collections::HashMap, error::Error};
+use tokio::io::{copy, AsyncWriteExt};
+use utilities::logger::{debug, info,error, span, trace, tracing::Level};
 
 pub struct CommandRunner {
     namenode: NamenodeHandler,
@@ -60,7 +61,9 @@ return self.handle_delete_file_command(inputs[1].to_owned()).await;
         local_file_path: String,
         remote_file_name: String,
     ) -> Result<String, Box<dyn Error>> {
+        span!(Level::TRACE,"storing file",%local_file_path,%remote_file_name);
         // get the file metadata
+        trace!("Fetching file metadata");
         let file_metadata = match tokio::fs::metadata(local_file_path.clone()).await {
             Ok(metadata) => metadata,
             Err(e) => {
@@ -80,14 +83,21 @@ return self.handle_delete_file_command(inputs[1].to_owned()).await;
         let mut file_chunker = FileChunker::new(local_file_path.clone(), &chunk_details);
         // send each data node to setup pilepline
         for chunk_detail in &chunk_details {
+            span!(Level::TRACE ,"working on chunk",chunk_id = %chunk_detail.id);
             let mut read_stream = file_chunker.next_chunk().await?;
-            self.datanode
+           let res =  self.datanode
                 .store_chunk(
                     chunk_detail.id.clone(),
                     chunk_detail.location.clone(),
                     &mut read_stream,
                 )
-                .await?;
+                .await;
+            match  res {
+               Ok(_)=>{},
+               Err(e)=>{
+                   error!("{}",e);
+               }
+            }
         }
         Ok("File stored successfully".to_owned())
     }
@@ -96,21 +106,31 @@ return self.handle_delete_file_command(inputs[1].to_owned()).await;
         remote_file_name: String,
         local_file_name: String,
     ) -> Result<String, Box<dyn Error>> {
-        debug!("fetching the file {remote_file_name}");
-        let chunk_details = self.namenode.fetch_file(remote_file_name).await?;
+        span!(Level::TRACE,"fetching file ",%remote_file_name,%local_file_name);
+        trace!("fetching the file {remote_file_name}");
+        let chunk_details = self.namenode.fetch_file(remote_file_name.clone()).await?;
+        trace!(%remote_file_name,chunk_details = ?chunk_details,"got chunk details for file");
         debug!("got chunk details for remote file {:?}", chunk_details);
-        // send each data node to setup pilepline
-        //for chunk_detail in &chunk_details {
-        //    //debug!("working on chunk : {:?}",chunk_details);
-        //    println!("working on chunk : {:?}", chunk_details);
-        //    self.datanode
-        //        .fetch_chunk(
-        //            chunk_detail.id.clone(),
-        //            //chunk_detail.location[0].clone()
-        //        )
-        //        .await?;
-        //}
-
+        //let mut chunk_to_read_stream_map = HashMap::new();
+        // now we will open a write stream to the target file
+        let mut target_file = tokio::fs::File::options().append(true).create(true).open(local_file_name).await?;
+        trace!("opened file in append only mode");
+        for chunk_detail in &chunk_details{
+            span!(Level::TRACE ,"working on chunk",chunk_id = %chunk_detail.id);
+            let fetch_chunk_result = {
+                self.datanode.fetch_chunk(
+                chunk_detail.id.clone(),chunk_detail.location[0].addrs.clone()).await };
+             match fetch_chunk_result{
+               Ok(mut read_stream)=>{
+                   //chunk_to_read_stream_map.insert(chunk_detail.id.clone(), read_stream);
+                   copy(&mut read_stream,&mut target_file).await?;
+               }
+               Err(e)=>{
+                   error!(error = %e,"Error during chunk fetching");
+                   return Err(e);
+               }
+           } 
+        }
         Ok("File fetched successfully".to_owned())
     }
     async fn handle_delete_file_command(
