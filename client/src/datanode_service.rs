@@ -8,14 +8,13 @@ use proto::generated::{
 };
 use tokio::io::{AsyncRead, AsyncWriteExt};
 use tonic::transport::{Channel, Endpoint};
-use utilities::logger::tracing;
-use utilities::logger::{instrument, trace};
+use utilities::logger::{instrument, trace, tracing};
 
 #[derive(Debug)]
-pub struct ChunkHandler {}
-impl ChunkHandler {
+pub struct DatanodeService {}
+impl DatanodeService {
     pub fn new() -> Self {
-        ChunkHandler {}
+        Self {}
     }
     async fn get_grpc_connection(
         &self,
@@ -40,7 +39,7 @@ impl ChunkHandler {
             .await
             .map_err(|e| format!("Error while connecting to stream at {:?} {:?}", addrs, e).into())
     }
-    #[instrument(skip(read_stream))]
+    #[instrument(skip(self, read_stream))]
     pub async fn store_chunk(
         &self,
         chunk_id: String,
@@ -61,6 +60,7 @@ impl ChunkHandler {
             .store_chunk(tonic::Request::new(store_chunk_request))
             .await?;
         let tcp_addrs = &store_chunk_response.get_ref().address;
+        trace!(%tcp_addrs,"Got tcp address");
         // connect to tcp stream and push data as [chunk_id,write_mode,bytes from stream]
         let mut tcp_stream = self.get_tcp_connection(tcp_addrs).await?;
         trace!("writing chunk_id");
@@ -71,7 +71,7 @@ impl ChunkHandler {
         tokio::io::copy(read_stream, &mut tcp_stream).await?;
         Ok(())
     }
-    #[instrument]
+    #[instrument(skip(self))]
     pub async fn fetch_chunk(
         &self,
         chunk_id: String,
@@ -87,6 +87,7 @@ impl ChunkHandler {
             .fetch_chunk(tonic::Request::new(fetch_chunk_request))
             .await?
             .into_inner();
+        trace!(tcp_addrs = %fetch_chunk_response.address,"Got tcp stream addres for datanode");
         let mut tcp_stream = self
             .get_tcp_connection(&fetch_chunk_response.address)
             .await?;

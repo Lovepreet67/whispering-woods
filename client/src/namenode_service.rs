@@ -5,18 +5,19 @@ use proto::generated::client_namenode::{
     client_name_node_client::ClientNameNodeClient,
 };
 use tonic::transport::{Channel, Endpoint};
-use utilities::logger::debug;
+use utilities::logger::{debug, info, instrument, tracing};
 
-pub struct NamenodeHandler {
+#[derive(Clone, Debug)]
+pub struct NamenodeService {
     address: String,
     connection: ClientNameNodeClient<Channel>,
 }
 
-impl NamenodeHandler {
+impl NamenodeService {
     pub async fn new(addrs: String) -> Self {
-        println!("connecting namenode at {:?}", addrs);
+        info!("connecting namenode at {:?}", addrs);
         let connection = Self::get_connection(addrs.clone()).await.unwrap();
-        NamenodeHandler {
+        Self {
             address: addrs,
             connection,
         }
@@ -35,6 +36,7 @@ impl NamenodeHandler {
             .map_err(|e| format!("Error while connecting to given address {:?}", e))?;
         Ok(ClientNameNodeClient::new(chanel))
     }
+    #[instrument(skip(self))]
     pub async fn store_file(
         &mut self,
         file_name: String,
