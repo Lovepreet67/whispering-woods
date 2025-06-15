@@ -1,26 +1,22 @@
-use std::{env, error::Error, sync::Arc};
+mod chunk_generator;
+mod client_handler;
+mod data_structure;
+mod datanode;
+mod namenode_state;
+mod state_mantainer;
 
 use client_handler::ClientHandler;
-use datanode_handler::DatanodeHandler;
+use datanode::handler::DatanodeHandler;
 use namenode_state::NamenodeState;
 use proto::generated::{
     client_namenode::client_name_node_server::ClientNameNodeServer,
     datanode_namenode::datanode_namenode_server::DatanodeNamenodeServer,
 };
 use state_mantainer::StateMantainer;
+use std::{env, error::Error, sync::Arc};
 use tokio::sync::Mutex;
 use tonic::transport::Server;
-use utilities::logger::info;
-use utilities::logger::init_logger;
-
-mod chunk_generator;
-mod client_handler;
-mod data_structure;
-mod datanode_handler;
-mod datanode_selection_policy;
-mod datanode_service;
-mod namenode_state;
-mod state_mantainer;
+use utilities::logger::{Level, info, init_logger, span};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -31,9 +27,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
         "3000".to_owned()
     };
     let _gaurd = init_logger("Namenode", &grpc_port);
+    let root_span = span!(Level::INFO, "root", service = "Namenode",node_id=%grpc_port);
+    let _entered = root_span.enter();
     let addr = format!("127.0.0.1:{}", grpc_port).parse()?;
     info!("Starting the grpc server on address : {addr}");
-
     let state = Arc::new(Mutex::new(NamenodeState::default()));
     let state_mantainer = StateMantainer::new(state.clone());
     state_mantainer.start();

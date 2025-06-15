@@ -35,7 +35,9 @@ impl DatanodeService {
         let request = DeleteChunkRequest {
             id: chunk_id.to_owned(),
         };
-        let response = Self::get_connection(datanode_addrs).await?.delete_chunk(tonic::Request::new(request)).await.map_err(|e|
+        let response = Self::get_connection(datanode_addrs).await?
+            .delete_chunk(tonic::Request::new(request)).await
+            .map_err(|e|
          format!("Error while sending the delete message to datanode : {},  for chunk : {}, error : {}",datanode_addrs,chunk_id,e))?;
         Ok(response.get_ref().available)
     }

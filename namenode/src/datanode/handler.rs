@@ -1,7 +1,6 @@
-use std::{os::macos::raw::stat, sync::Arc, time::Instant};
+use std::{sync::Arc, time::Instant};
 
 use tokio::sync::Mutex;
-use utilities::logger::{info, trace};
 
 use crate::namenode_state;
 use crate::namenode_state::NamenodeState;

@@ -1,27 +1,27 @@
 mod client;
+mod datanode_state;
 mod namenode;
 mod peer;
-mod tcp;
-mod datanode_state;
 mod state_mantainer;
+mod tcp;
 
-use proto::generated::client_datanode::client_data_node_server::ClientDataNodeServer;
-use proto::generated::datanode_datanode::peer_server::PeerServer;
-use storage::file_storage;
-use tonic::transport::Server;
-use datanode_state::DatanodeState;
 use client::handler::ClientHandler;
+use datanode_state::DatanodeState;
 use namenode::handler::NamenodeHandler;
 use namenode::service::NamenodeService;
+use proto::generated::client_datanode::client_data_node_server::ClientDataNodeServer;
+use proto::generated::datanode_datanode::peer_server::PeerServer;
 use proto::generated::namenode_datanode::namenode_datanode_server::NamenodeDatanodeServer;
 use state_mantainer::StateMantainer;
 use std::env;
 use std::error::Error;
 use std::sync::Arc;
 use std::time::Duration;
+use storage::file_storage;
 use tokio::sync::Mutex;
 use tokio::time::sleep;
-use utilities::logger::{error, info, init_logger, span, trace, Instrument, Level};
+use tonic::transport::Server;
+use utilities::logger::{Instrument, Level, error, info, init_logger, span, trace};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -68,14 +68,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // we will create storage which will be used by the tcp service to serve a file
     info!("Starting the tcp server on grpc port: {}", tcp_port);
     let tcp_handler = tcp::service::TCPService::new(tcp_port, store.clone(), state.clone()).await?;
-    tokio::spawn(async move {
-        match tcp_handler.start_and_accept().await {
-            Ok(_) => {}
-            Err(e) => {
-                error!("erorr while accepting tcp request {e}");
+    tokio::spawn(
+        async move {
+            match tcp_handler.start_and_accept().await {
+                Ok(_) => {}
+                Err(e) => {
+                    error!("erorr while accepting tcp request {e}");
+                }
             }
-        }    }.instrument(root_span.clone())
- );
+        }
+        .instrument(root_span.clone()),
+    );
     info!("Server s address : {addr}");
 
     // starting datanode state mantainer for datanode
@@ -84,47 +87,50 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // heartbeat sending logic
     let namenode_service = NamenodeService::new(state.clone());
-    tokio::spawn(async move {
-        match namenode_service.connect().await {
-            Ok(v) => {
-                if v {
-                    info!("successfully connected to the namenode");
-                } else {
-                    info!("Namenode refused to connect hence terminating");
+    tokio::spawn(
+        async move {
+            match namenode_service.connect().await {
+                Ok(v) => {
+                    if v {
+                        info!("successfully connected to the namenode");
+                    } else {
+                        info!("Namenode refused to connect hence terminating");
+                        std::process::exit(1);
+                    }
+                }
+                Err(e) => {
+                    error!("{e}");
                     std::process::exit(1);
                 }
             }
-            Err(e) => {
-                error!("{e}");
-                std::process::exit(1);
-            }
-        }
-        // after every 10 heartbeats we will share state with name node;
-        let mut x: u8 = 0;
-        loop {
-            sleep(Duration::from_secs(3)).await;
-            match namenode_service.send_heart_beat().await {
-                Ok(_) => {
-                    //trace!("sent heartbeat successfully")
-                }
-                Err(e) => {
-                    error!("rror while sending heartbeat {e}");
-                }
-            }
-            if x % 10 == 0 {
-                x = 0;
-                match namenode_service.state_sync().await {
+            // after every 10 heartbeats we will share state with name node;
+            let mut x: u8 = 0;
+            loop {
+                sleep(Duration::from_secs(3)).await;
+                match namenode_service.send_heart_beat().await {
                     Ok(_) => {
-                        trace!("Sent state sync message to namenode");
+                        //trace!("sent heartbeat successfully")
                     }
                     Err(e) => {
-                        error!("Error while sending the state sync method to namenode {e}");
+                        error!("rror while sending heartbeat {e}");
                     }
                 }
+                if x % 10 == 0 {
+                    x = 0;
+                    match namenode_service.state_sync().await {
+                        Ok(_) => {
+                            trace!("Sent state sync message to namenode");
+                        }
+                        Err(e) => {
+                            error!("Error while sending the state sync method to namenode {e}");
+                        }
+                    }
+                }
+                x += 1;
             }
-            x += 1;
         }
-    }.instrument(root_span.clone())
-    ).await;
+        .instrument(root_span.clone()),
+    )
+    .await;
     Ok(())
 }

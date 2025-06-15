@@ -6,9 +6,9 @@ use tokio::{
     net::{TcpListener, TcpStream},
     sync::Mutex,
 };
-use utilities::logger::{error, instrument, trace, tracing, Instrument, Span};
+use utilities::logger::{Instrument, Span, error, instrument, trace, tracing};
 
-use crate::{datanode_state::DatanodeState,tcp::stream_tee};
+use crate::{datanode_state::DatanodeState, tcp::stream_tee};
 
 pub struct TCPService {
     listener: TcpListener,
@@ -36,14 +36,17 @@ impl TCPService {
             let store = self.store.clone();
             let state = self.state.clone();
             let span = Span::current();
-            tokio::spawn(async move {
-                if let Err(e) = Self::handle_connection(tcp_stream, store, state).await {
-                    error!("error while handling the tcp connection {e}");
+            tokio::spawn(
+                async move {
+                    if let Err(e) = Self::handle_connection(tcp_stream, store, state).await {
+                        error!("error while handling the tcp connection {e}");
+                    }
                 }
-            }.instrument(span));
+                .instrument(span),
+            );
         }
     }
-    #[instrument(skip(tcp_stream,store,state))]
+    #[instrument(skip(tcp_stream, store, state))]
     async fn handle_connection(
         mut tcp_stream: TcpStream,
         store: FileStorage,

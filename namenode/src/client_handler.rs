@@ -6,13 +6,18 @@ use proto::generated::client_namenode::{
 };
 use tokio::sync::Mutex;
 use tonic::Code;
-use utilities::logger::{debug, error};
+use utilities::logger::{Level, debug, info, span, trace};
 
 use crate::{
     chunk_generator::{ChunkGenerator, DefaultChunkGenerator},
     data_structure::ChunkBounderies,
-    datanode_selection_policy::{DatanodeSelectionPolicy, DefaultDatanodeSelectionPolicy},
-    datanode_service::DatanodeService,
+    datanode::{
+        selection_policy::{
+            default_selection_policy::DefaultDatanodeSelectionPolicy,
+            selection_policy::DatanodeSelectionPolicy,
+        },
+        service::DatanodeService,
+    },
     namenode_state::NamenodeState,
 };
 
@@ -42,9 +47,12 @@ impl ClientNameNode for ClientHandler {
         request: tonic::Request<StoreFileRequest>,
     ) -> Result<tonic::Response<StoreFileResponse>, tonic::Status> {
         let store_file_request = request.get_ref();
+        let fn_span = span!(Level::INFO,"store_file",file_name = %store_file_request.file_name,file_size=%store_file_request.file_size);
+        let _entered = fn_span.enter();
         let chunk_bounderies = self
             .chunk_generator
             .get_chunks(store_file_request.file_size, &store_file_request.file_name);
+        trace!(bounderies = ?chunk_bounderies,"Got chunk_bounderies");
         let mut chunk_meta: Vec<ChunkMeta> = vec![];
         for chunk_boundery in chunk_bounderies {
             let location = self
@@ -76,7 +84,7 @@ impl ClientNameNode for ClientHandler {
                 },
             );
         });
-
+        trace!(chunk_meta = ?chunk_meta,"Handled request");
         let store_file_response = StoreFileResponse {
             file_name: store_file_request.file_name.clone(),
             chunk_list: chunk_meta,
@@ -88,10 +96,8 @@ impl ClientNameNode for ClientHandler {
         request: tonic::Request<FetchFileRequest>,
     ) -> Result<tonic::Response<FetchFileResponse>, tonic::Status> {
         let fetch_file_request = request.get_ref();
-        debug!(
-            "got request to fetch file : {}",
-            fetch_file_request.file_name
-        );
+        let fn_span = span!(Level::INFO,"fetch_file",file_name = %fetch_file_request.file_name);
+        let _entered = fn_span.enter();
         //TODO: find something better than cloning state
         //if we don't clone here this becomes deadlock when we can function get_datanodes_to_serve
         //which also uses state may be reader writer locak will help
@@ -100,14 +106,12 @@ impl ClientNameNode for ClientHandler {
             debug!("found file");
             let mut chunk_list: Vec<ChunkMeta> = vec![];
             for chunk in chunks {
-                debug!("working on chunk {:?}", chunk);
                 let location = match self.datanode_selector.get_datanodes_to_serve(chunk).await {
                     Ok(location) => location,
                     Err(e) => {
                         return Err(tonic::Status::not_found(format!("{}", e)));
                     }
                 };
-                debug!("we got locations that will serve {:?}", location);
                 let chunk_boundery = match state.chunk_to_boundry_map.get(chunk) {
                     Some(v) => v,
                     None => {
@@ -121,6 +125,7 @@ impl ClientNameNode for ClientHandler {
                     end_offset: chunk_boundery.end_offset,
                 });
             }
+            trace!(chunk_list = ?chunk_list,"fetch file request Handled");
             let fetch_file_response = FetchFileResponse {
                 file_name: fetch_file_request.file_name.clone(),
                 chunk_list,
@@ -137,6 +142,11 @@ impl ClientNameNode for ClientHandler {
         request: tonic::Request<DeleteFileRequest>,
     ) -> Result<tonic::Response<DeleteFileResponse>, tonic::Status> {
         let delete_file_request = request.get_ref();
+        let fn_span = span!(
+            Level::INFO,
+            "delete_file",
+            file_name = delete_file_request.file_name
+        );
         let mut state = self.state.lock().await;
         let chunks = match state
             .file_to_chunk_map
@@ -148,7 +158,7 @@ impl ClientNameNode for ClientHandler {
                 return Ok(tonic::Response::new(delete_file_response));
             }
         };
-        debug!(?chunks, "got chunks ");
+        trace!(?chunks, "got chunks ");
         for chunk in &chunks {
             if let Some(location) = state.chunk_to_location_map.get(chunk) {
                 for datanode_id in location {
@@ -180,6 +190,7 @@ impl ClientNameNode for ClientHandler {
         for chunk in &chunks {
             state.deleted_chunks.insert(chunk.to_owned());
         }
+        trace!("delete file request handeled");
         let delete_file_response = DeleteFileResponse { file_present: true };
         Ok(tonic::Response::new(delete_file_response))
     }

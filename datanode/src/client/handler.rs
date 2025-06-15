@@ -1,13 +1,13 @@
-use std::error::Error;
-use std::sync::Arc;
 use proto::generated::client_datanode::client_data_node_server::ClientDataNode;
 use proto::generated::client_datanode::{
     EchoRequest, EchoResponse, FetchChunkRequest, FetchChunkResponse, StoreChunkRequest,
     StoreChunkResponse,
 };
+use std::error::Error;
+use std::sync::Arc;
 use tokio::net::TcpStream;
 use tokio::sync::Mutex;
-use utilities::logger::{tracing,debug, instrument, trace};
+use utilities::logger::{debug, instrument, trace, tracing};
 
 use crate::datanode_state::DatanodeState;
 use crate::peer::service::PeerService;
@@ -99,7 +99,7 @@ impl ClientDataNode for ClientHandler {
         let fetch_chunk_request = request.into_inner();
         trace!(request = ?fetch_chunk_request,"Got request");
         let state = self.state.lock().await;
-        trace!(?state,"Got current state of datanode");
+        trace!(?state, "Got current state of datanode");
         if !state
             .available_chunks
             .contains(&fetch_chunk_request.chunk_id)

@@ -5,7 +5,7 @@ use proto::generated::{
     },
 };
 use storage::{file_storage::FileStorage, storage::Storage};
-use utilities::logger::{tracing,debug, error, instrument};
+use utilities::logger::{debug, error, instrument, tracing};
 
 pub struct NamenodeHandler {
     store: FileStorage,
