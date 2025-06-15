@@ -5,6 +5,7 @@ use proto::generated::{
     datanode_datanode::{CreatePipelineRequest, peer_client::PeerClient},
 };
 use tonic::transport::{Channel, Endpoint};
+use utilities::logger::{instrument, trace, tracing};
 
 pub struct PeerService {}
 
@@ -28,12 +29,13 @@ impl PeerService {
         })?;
         Ok(PeerClient::new(channel))
     }
-
+    #[instrument(skip(self))]
     pub async fn create_pipeline(
         &self,
         chunk_id: &str,
         replica_set: &[DataNodeMeta],
     ) -> Result<String, Box<dyn Error>> {
+        trace!("Sending create pipeline request to peers");
         // since there are other replica we will have to send create pipeline message to next
         // replica
         let create_pipeline_request = CreatePipelineRequest {

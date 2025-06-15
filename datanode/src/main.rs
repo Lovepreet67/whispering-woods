@@ -1,6 +1,18 @@
+mod client;
+mod namenode;
+mod peer;
+mod tcp;
+mod datanode_state;
+mod state_mantainer;
+
+use proto::generated::client_datanode::client_data_node_server::ClientDataNodeServer;
+use proto::generated::datanode_datanode::peer_server::PeerServer;
+use storage::file_storage;
+use tonic::transport::Server;
 use datanode_state::DatanodeState;
-use namenode_handler::NamenodeHandler;
-use namenode_service::NamenodeService;
+use client::handler::ClientHandler;
+use namenode::handler::NamenodeHandler;
+use namenode::service::NamenodeService;
 use proto::generated::namenode_datanode::namenode_datanode_server::NamenodeDatanodeServer;
 use state_mantainer::StateMantainer;
 use std::env;
@@ -9,22 +21,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
 use tokio::time::sleep;
-use utilities::logger::{error, info, init_logger, trace};
-
-pub mod client_handler;
-mod datanode_state;
-pub mod peer_handler;
-mod peer_service;
-mod state_mantainer;
-pub mod tcp_service;
-use client_handler::ClientHandler;
-use proto::generated::client_datanode::client_data_node_server::ClientDataNodeServer;
-use proto::generated::datanode_datanode::peer_server::PeerServer;
-use storage::file_storage;
-use tonic::transport::Server;
-mod namenode_handler;
-mod namenode_service;
-mod tcp_stream_tee;
+use utilities::logger::{error, info, init_logger, span, trace, Instrument, Level};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -46,6 +43,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
         "http://127.0.0.1:7000".to_owned()
     };
     let _gaurd = init_logger("Datanode", &grpc_port);
+    let root_span = span!(Level::INFO, "root", service = "Datanode",node_id=%grpc_port);
+    let _entered = root_span.enter();
     let addr = format!("127.0.0.1:{}", grpc_port).parse()?;
     info!("Starting the grpc server on address : {addr}");
     let state = Arc::new(Mutex::new(DatanodeState::new(
@@ -55,7 +54,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         namenode_addrs,
     )));
     let ch = ClientHandler::new(state.clone());
-    let ph = peer_handler::PeerHandler::new(state.clone());
+    let ph = peer::handler::PeerHandler::new(state.clone());
     // first we will start grpc server
     let store = file_storage::FileStorage::new(format!("./temp/{}", grpc_port));
     let grpc_server = Server::builder()
@@ -65,18 +64,18 @@ async fn main() -> Result<(), Box<dyn Error>> {
             store.clone(),
         )))
         .serve(addr);
-    tokio::spawn(grpc_server);
+    tokio::spawn(grpc_server.instrument(root_span.clone()));
     // we will create storage which will be used by the tcp service to serve a file
     info!("Starting the tcp server on grpc port: {}", tcp_port);
-    let tcp_handler = tcp_service::TCPService::new(tcp_port, store.clone(), state.clone()).await?;
+    let tcp_handler = tcp::service::TCPService::new(tcp_port, store.clone(), state.clone()).await?;
     tokio::spawn(async move {
         match tcp_handler.start_and_accept().await {
             Ok(_) => {}
             Err(e) => {
                 error!("erorr while accepting tcp request {e}");
             }
-        }
-    });
+        }    }.instrument(root_span.clone())
+ );
     info!("Server s address : {addr}");
 
     // starting datanode state mantainer for datanode
@@ -106,7 +105,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             sleep(Duration::from_secs(3)).await;
             match namenode_service.send_heart_beat().await {
                 Ok(_) => {
-                    trace!("sent heartbeat successfully")
+                    //trace!("sent heartbeat successfully")
                 }
                 Err(e) => {
                     error!("rror while sending heartbeat {e}");
@@ -116,7 +115,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 x = 0;
                 match namenode_service.state_sync().await {
                     Ok(_) => {
-                        trace!("Sent state sync method to namenode");
+                        trace!("Sent state sync message to namenode");
                     }
                     Err(e) => {
                         error!("Error while sending the state sync method to namenode {e}");
@@ -125,7 +124,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             }
             x += 1;
         }
-    })
-    .await;
+    }.instrument(root_span.clone())
+    ).await;
     Ok(())
 }

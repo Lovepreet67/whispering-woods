@@ -2,7 +2,7 @@ use std::{sync::Arc, time::Duration};
 
 use storage::{file_storage::FileStorage, storage::Storage};
 use tokio::{sync::Mutex, time::interval};
-use utilities::logger::{error, info};
+use utilities::logger::{tracing,error, instrument};
 
 use crate::datanode_state::DatanodeState;
 
@@ -14,6 +14,7 @@ impl StateMantainer {
     pub fn new(store: FileStorage, state: Arc<Mutex<DatanodeState>>) -> Self {
         Self { store, state }
     }
+    #[instrument(skip(self,duration))]
     pub fn start_sync_loop(self, duration: Duration) {
         tokio::spawn(async move {
             let mut ticker = interval(duration);

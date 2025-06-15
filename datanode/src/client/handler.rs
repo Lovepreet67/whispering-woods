@@ -1,6 +1,5 @@
 use std::error::Error;
 use std::sync::Arc;
-
 use proto::generated::client_datanode::client_data_node_server::ClientDataNode;
 use proto::generated::client_datanode::{
     EchoRequest, EchoResponse, FetchChunkRequest, FetchChunkResponse, StoreChunkRequest,
@@ -8,10 +7,10 @@ use proto::generated::client_datanode::{
 };
 use tokio::net::TcpStream;
 use tokio::sync::Mutex;
-use utilities::logger::{debug, trace};
+use utilities::logger::{tracing,debug, instrument, trace};
 
 use crate::datanode_state::DatanodeState;
-use crate::peer_service::PeerService;
+use crate::peer::service::PeerService;
 
 pub struct ClientHandler {
     state: Arc<Mutex<DatanodeState>>,
@@ -45,14 +44,16 @@ impl ClientDataNode for ClientHandler {
         };
         Ok(tonic::Response::new(response))
     }
+    #[instrument(skip(self,request),fields(chunk_id =  %request.get_ref().chunk_id))]
     async fn store_chunk(
         &self,
         request: tonic::Request<StoreChunkRequest>,
     ) -> Result<tonic::Response<StoreChunkResponse>, tonic::Status> {
         let store_request = request.get_ref();
+        trace!(request = ?store_request,"Got request");
         // first we will send the create pipeling request to the next replica
         if store_request.replica_set.len() > 1 {
-            debug!("replica set is >1 so we are creating piplines");
+            trace!("replica set is >1 so we are creating piplines");
             let tcp_address = match self
                 .peer_service
                 .create_pipeline(&store_request.chunk_id, &store_request.replica_set[1..])
@@ -66,7 +67,7 @@ impl ClientDataNode for ClientHandler {
                     )));
                 }
             };
-            debug!("Got the pipeline address {tcp_address}");
+            trace!(tcp_addrs = %tcp_address,"Got the pipeline address");
             let tcp_connection = match self.get_tcp_connection(&tcp_address).await {
                 Ok(connection) => connection,
                 Err(e) => {
@@ -90,13 +91,15 @@ impl ClientDataNode for ClientHandler {
         };
         Ok(tonic::Response::new(response))
     }
+    #[instrument(skip(self,request),fields(chunk_id = %request.get_ref().chunk_id))]
     async fn fetch_chunk(
         &self,
         request: tonic::Request<FetchChunkRequest>,
     ) -> Result<tonic::Response<FetchChunkResponse>, tonic::Status> {
         let fetch_chunk_request = request.into_inner();
-        trace!(chunk_id = %fetch_chunk_request.chunk_id,"got fetch chunk request");
+        trace!(request = ?fetch_chunk_request,"Got request");
         let state = self.state.lock().await;
+        trace!(?state,"Got current state of datanode");
         if !state
             .available_chunks
             .contains(&fetch_chunk_request.chunk_id)

@@ -48,7 +48,7 @@ impl CommandRunner {
                 return self.delete_file_handler.delete_file(inputs[1].to_owned()).await;
             }
             help_command if help_command == "help\n" => {
-                Ok("fetch command : fetch remote_file_location target_file_path\nstore command : store source_file_location target_remote_file_name\ndelete command : delete target_remote_file_name\n".to_owned())
+                Ok("\nfetch command : fetch remote_file_location target_file_path\nstore command : store source_file_location target_remote_file_name\ndelete command : delete target_remote_file_name\n".to_owned())
             }
             _ => {
                 Err(

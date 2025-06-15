@@ -5,7 +5,7 @@ use proto::generated::{
     },
 };
 use storage::{file_storage::FileStorage, storage::Storage};
-use utilities::logger::{debug, error};
+use utilities::logger::{tracing,debug, error, instrument};
 
 pub struct NamenodeHandler {
     store: FileStorage,
@@ -19,13 +19,13 @@ impl NamenodeHandler {
 
 #[tonic::async_trait]
 impl NamenodeDatanode for NamenodeHandler {
+    #[instrument(skip(self,request), fields(chunk_id = %request.get_ref().id))]
     async fn delete_chunk(
         &self,
         request: tonic::Request<DeleteChunkRequest>,
     ) -> Result<tonic::Response<DeleteChunkResponse>, tonic::Status> {
         let delete_chunk_request = request.into_inner();
         let chunk_id = delete_chunk_request.id;
-        debug!(%chunk_id,"deleting chunk from data node");
         let exists = match self.store.delete(chunk_id).await {
             Ok(v) => v,
             Err(e) => {

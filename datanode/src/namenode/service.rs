@@ -1,12 +1,12 @@
 use std::{error::Error, str::FromStr, sync::Arc, time::Duration};
 
 use proto::generated::datanode_namenode::{
-    ConnectionRequest, HeartBeatRequest, HeartBeatResponse, StateSyncRequest,
-    datanode_namenode_client::DatanodeNamenodeClient, datanode_namenode_server::DatanodeNamenode,
+    ConnectionRequest, HeartBeatRequest, StateSyncRequest,
+    datanode_namenode_client::DatanodeNamenodeClient 
 };
 use tokio::sync::Mutex;
 use tonic::transport::{Channel, Endpoint};
-use utilities::logger::{info, trace};
+use utilities::logger::trace;
 
 use crate::datanode_state::DatanodeState;
 
@@ -56,7 +56,6 @@ impl NamenodeService {
             }
         }
     }
-
     pub async fn send_heart_beat(&self) -> Result<(), Box<dyn Error>> {
         let state = self.state.lock().await;
         let namenode_addrs = state.namenode_addrs.clone();
@@ -73,13 +72,12 @@ impl NamenodeService {
     pub async fn state_sync(&self) -> Result<(), Box<dyn Error>> {
         let state = self.state.lock().await;
         let namenode_addrs = state.namenode_addrs.clone();
-        trace!("sending state sync with {:?}", state);
+        trace!(?state,"sending state sync with");
         let state_sync_request = StateSyncRequest {
             id: state.get_id(),
             available_chunks: state.available_chunks.clone(),
             availabe_storage: state.available_storage as u64,
         };
-
         drop(state);
         let mut namenode_client = self.get_grpc_connection(&namenode_addrs).await?;
         namenode_client
