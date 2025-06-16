@@ -6,7 +6,7 @@ use proto::generated::client_namenode::{
 };
 use tokio::sync::Mutex;
 use tonic::Code;
-use utilities::logger::{Level, debug, info, span, trace};
+use utilities::logger::{Level, debug, span, trace};
 
 use crate::{
     chunk_generator::{ChunkGenerator, DefaultChunkGenerator},
@@ -18,6 +18,7 @@ use crate::{
         },
         service::DatanodeService,
     },
+    ledger::default_ledger::Ledger,
     namenode_state::NamenodeState,
 };
 
@@ -26,9 +27,10 @@ pub struct ClientHandler {
     datanode_selector: Box<dyn DatanodeSelectionPolicy + Send + Sync>,
     chunk_generator: Box<dyn ChunkGenerator + Send + Sync>,
     datanode_service: DatanodeService,
+    ledger: Box<dyn Ledger + Send + Sync>,
 }
 impl ClientHandler {
-    pub fn new(state: Arc<Mutex<NamenodeState>>) -> Self {
+    pub fn new(state: Arc<Mutex<NamenodeState>>, ledger: Box<dyn Ledger + Send + Sync>) -> Self {
         let datanode_selection_policy =
             Box::new(DefaultDatanodeSelectionPolicy::new(state.clone()));
         let chunk_generator = Box::new(DefaultChunkGenerator::new((64 * 1024 * 1024) as u64));
@@ -37,6 +39,7 @@ impl ClientHandler {
             datanode_selector: datanode_selection_policy,
             chunk_generator,
             datanode_service: DatanodeService::new(),
+            ledger,
         }
     }
 }
@@ -53,8 +56,20 @@ impl ClientNameNode for ClientHandler {
             .chunk_generator
             .get_chunks(store_file_request.file_size, &store_file_request.file_name);
         trace!(bounderies = ?chunk_bounderies,"Got chunk_bounderies");
+        self.ledger
+            .store_file(&store_file_request.file_name, chunk_bounderies.len() as u64)
+            .await;
         let mut chunk_meta: Vec<ChunkMeta> = vec![];
         for chunk_boundery in chunk_bounderies {
+            self.ledger
+                .store_chunk(
+                    &store_file_request.file_name,
+                    chunk_meta.len() as u64,
+                    &chunk_boundery.chunk_id,
+                    chunk_boundery.start_offset,
+                    chunk_boundery.end_offset,
+                )
+                .await;
             let location = self
                 .datanode_selector
                 .get_datanodes_to_store(chunk_boundery.end_offset - chunk_boundery.start_offset)
@@ -147,6 +162,10 @@ impl ClientNameNode for ClientHandler {
             "delete_file",
             file_name = delete_file_request.file_name
         );
+        let _enter = fn_span.enter();
+        self.ledger
+            .delete_file(&delete_file_request.file_name)
+            .await;
         let mut state = self.state.lock().await;
         let chunks = match state
             .file_to_chunk_map
@@ -160,6 +179,9 @@ impl ClientNameNode for ClientHandler {
         };
         trace!(?chunks, "got chunks ");
         for chunk in &chunks {
+            self.ledger
+                .delete_chunk(&delete_file_request.file_name, &chunk)
+                .await;
             if let Some(location) = state.chunk_to_location_map.get(chunk) {
                 for datanode_id in location {
                     debug!(?datanode_id, ?chunk, "deleting on this location ");

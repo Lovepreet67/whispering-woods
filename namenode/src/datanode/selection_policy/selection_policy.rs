@@ -10,7 +10,3 @@ pub trait DatanodeSelectionPolicy {
     ) -> Result<Vec<DataNodeMeta>, Box<dyn Error>>;
     async fn get_datanodes_to_serve(&self, chunk_id: &str) -> Result<DataNodeMeta, Box<dyn Error>>;
 }
-
-pub fn hello() {
-    println!("helo");
-}
