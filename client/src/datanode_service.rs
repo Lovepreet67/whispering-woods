@@ -8,13 +8,20 @@ use proto::generated::{
 };
 use tokio::io::{AsyncRead, AsyncWriteExt};
 use tonic::transport::{Channel, Endpoint};
-use utilities::logger::{instrument, trace, tracing};
+use utilities::{
+    logger::{instrument, trace, tracing},
+    tcp_pool::TcpPool,
+};
 
 #[derive(Debug)]
-pub struct DatanodeService {}
+pub struct DatanodeService {
+    tcp_connection_pool: TcpPool,
+}
 impl DatanodeService {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            tcp_connection_pool: TcpPool::new(),
+        }
     }
     async fn get_grpc_connection(
         &self,
@@ -29,15 +36,6 @@ impl DatanodeService {
             .await
             .map_err(|e| format!("Error while connecting to address {:?}", e))?;
         Ok(ClientDataNodeClient::new(channel))
-    }
-    async fn get_tcp_connection(
-        &self,
-        addrs: &str,
-    ) -> Result<tokio::net::TcpStream, Box<dyn Error>> {
-        trace!("Establishing tcp connection to {}", addrs);
-        tokio::net::TcpStream::connect(addrs)
-            .await
-            .map_err(|e| format!("Error while connecting to stream at {:?} {:?}", addrs, e).into())
     }
     #[instrument(skip(self, read_stream))]
     pub async fn store_chunk(
@@ -62,7 +60,7 @@ impl DatanodeService {
         let tcp_addrs = &store_chunk_response.get_ref().address;
         trace!(%tcp_addrs,"Got tcp address");
         // connect to tcp stream and push data as [chunk_id,write_mode,bytes from stream]
-        let mut tcp_stream = self.get_tcp_connection(tcp_addrs).await?;
+        let mut tcp_stream = self.tcp_connection_pool.get_connection(tcp_addrs).await?;
         trace!("writing chunk_id");
         tcp_stream.write_all(chunk_id.as_bytes()).await?;
         trace!("writing mode to file");
@@ -89,7 +87,8 @@ impl DatanodeService {
             .into_inner();
         trace!(tcp_addrs = %fetch_chunk_response.address,"Got tcp stream addres for datanode");
         let mut tcp_stream = self
-            .get_tcp_connection(&fetch_chunk_response.address)
+            .tcp_connection_pool
+            .get_connection(&fetch_chunk_response.address)
             .await?;
         trace!("writing chunk id");
         tcp_stream.write_all(chunk_id.as_bytes()).await?;

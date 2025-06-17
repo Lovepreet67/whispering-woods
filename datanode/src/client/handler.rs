@@ -3,11 +3,10 @@ use proto::generated::client_datanode::{
     EchoRequest, EchoResponse, FetchChunkRequest, FetchChunkResponse, StoreChunkRequest,
     StoreChunkResponse,
 };
-use std::error::Error;
 use std::sync::Arc;
-use tokio::net::TcpStream;
 use tokio::sync::Mutex;
 use utilities::logger::{debug, instrument, trace, tracing};
+use utilities::tcp_pool::TcpPool;
 
 use crate::datanode_state::DatanodeState;
 use crate::peer::service::PeerService;
@@ -15,21 +14,15 @@ use crate::peer::service::PeerService;
 pub struct ClientHandler {
     state: Arc<Mutex<DatanodeState>>,
     peer_service: PeerService,
+    tcp_connection_pool: TcpPool,
 }
 impl ClientHandler {
     pub fn new(state: Arc<Mutex<DatanodeState>>) -> Self {
         Self {
             state,
             peer_service: PeerService {},
+            tcp_connection_pool: TcpPool::new(),
         }
-    }
-    async fn get_tcp_connection(&self, addrs: &str) -> Result<TcpStream, Box<dyn Error>> {
-        Ok(TcpStream::connect(addrs).await.map_err(|e| {
-            format!(
-                "error while creating the tcp connection addrs : {}, error: {}",
-                addrs, e
-            )
-        })?)
     }
 }
 #[tonic::async_trait]
@@ -68,7 +61,7 @@ impl ClientDataNode for ClientHandler {
                 }
             };
             trace!(tcp_addrs = %tcp_address,"Got the pipeline address");
-            let tcp_connection = match self.get_tcp_connection(&tcp_address).await {
+            let tcp_connection = match self.tcp_connection_pool.get_connection(&tcp_address).await {
                 Ok(connection) => connection,
                 Err(e) => {
                     return Err(tonic::Status::internal(format!(

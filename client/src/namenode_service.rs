@@ -9,7 +9,7 @@ use utilities::logger::{debug, info, instrument, tracing};
 
 #[derive(Clone, Debug)]
 pub struct NamenodeService {
-    address: String,
+    //address: String,
     connection: ClientNameNodeClient<Channel>,
 }
 
@@ -18,7 +18,7 @@ impl NamenodeService {
         info!("connecting namenode at {:?}", addrs);
         let connection = Self::get_connection(addrs.clone()).await.unwrap();
         Self {
-            address: addrs,
+            //address: addrs,
             connection,
         }
     }

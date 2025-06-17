@@ -13,7 +13,7 @@ pub struct FileChunker<'a> {
 }
 
 impl<'a> FileChunker<'a> {
-    pub fn new(file_path: String, chunk_details: &'a Vec<ChunkMeta>) -> FileChunker {
+    pub fn new(file_path: String, chunk_details: &'a Vec<ChunkMeta>) -> FileChunker<'a> {
         FileChunker {
             file_path,
             chunk_details,

@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use utilities::logger::{Level, error, info, instrument, span, trace, tracing};
+use utilities::logger::{error, info, instrument, trace, tracing};
 
 use crate::{
     datanode_service::DatanodeService, file_chunker::FileChunker, namenode_service::NamenodeService,

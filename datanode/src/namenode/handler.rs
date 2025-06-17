@@ -1,11 +1,8 @@
-use proto::generated::{
-    client_namenode::DeleteFileResponse,
-    namenode_datanode::{
-        DeleteChunkRequest, DeleteChunkResponse, namenode_datanode_server::NamenodeDatanode,
-    },
+use proto::generated::namenode_datanode::{
+    DeleteChunkRequest, DeleteChunkResponse, namenode_datanode_server::NamenodeDatanode,
 };
 use storage::{file_storage::FileStorage, storage::Storage};
-use utilities::logger::{debug, error, instrument, tracing};
+use utilities::logger::{error, instrument, tracing};
 
 pub struct NamenodeHandler {
     store: FileStorage,
