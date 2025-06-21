@@ -2,7 +2,7 @@ use std::{
     error::Error,
     path::{Path, PathBuf},
 };
-use tracing::{debug, error};
+use tracing::{debug, error, info, trace};
 
 use crate::storage::Storage;
 use tokio::{
@@ -16,6 +16,16 @@ pub struct FileStorage {
 }
 impl FileStorage {
     pub fn new(root: String) -> Self {
+        match std::fs::create_dir_all(&root) {
+            Ok(_v)=>{
+                info!(%root,"Created root for storage");
+            }
+            Err(e)=>{
+                error!(%root,error=%e,"Error while creating the root for storage");
+                panic!("Error during creating directory")
+            }
+            
+        }
         FileStorage { root }
     }
     fn get_path(&self, chunk_id: &str) -> PathBuf {
@@ -56,6 +66,7 @@ impl Storage for FileStorage {
         Ok(exists)
     }
     async fn available_chunks(&self) -> Result<Vec<String>, Box<dyn Error>> {
+        info!(root=%self.root,"Reading the dir to get available chunks");
         let mut dir_enteries = fs::read_dir(&self.root).await?;
         let mut chunk_ids = vec![];
         while let Some(chunk) = dir_enteries.next_entry().await? {
