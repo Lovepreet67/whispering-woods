@@ -41,6 +41,7 @@ impl StoreFileHandler {
         let mut file_chunker = FileChunker::new(local_file_path.clone(), &chunk_details);
         // send each data node to setup pilepline
         for chunk_detail in &chunk_details {
+            trace!(id = %chunk_detail.id,"working on chunk");
             let mut read_stream = file_chunker.next_chunk().await?;
             let res = self
                 .datanode

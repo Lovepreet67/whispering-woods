@@ -34,6 +34,7 @@ impl NamenodeService {
             .connect()
             .await
             .map_err(|e| format!("Error while connecting to given address {:?}", e))?;
+        info!("Connected to namenode successfully");
         Ok(ClientNameNodeClient::new(chanel))
     }
     #[instrument(skip(self))]
