@@ -18,11 +18,10 @@ pub struct TCPService {
 
 impl TCPService {
     pub async fn new(
-        port: String,
+        address: String,
         store: FileStorage,
         state: Arc<Mutex<DatanodeState>>,
     ) -> Result<Self, Box<dyn Error>> {
-        let address = format!("127.0.0.1:{}", port).to_owned();
         let listener = TcpListener::bind(address).await?;
         Ok(TCPService {
             listener,

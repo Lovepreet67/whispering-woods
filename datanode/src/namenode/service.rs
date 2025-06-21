@@ -6,7 +6,7 @@ use proto::generated::datanode_namenode::{
 };
 use tokio::sync::Mutex;
 use tonic::transport::{Channel, Endpoint};
-use utilities::logger::trace;
+use utilities::logger::{error, info, trace};
 
 use crate::datanode_state::DatanodeState;
 
@@ -41,17 +41,21 @@ impl NamenodeService {
         drop(state);
         // now we will send connection Request
         let connection_request = ConnectionRequest {
+            name: id.clone(),
             id,
             addrs: grpc_server_addrs,
-            name: "no one".to_owned(),
         };
         let mut namenode_client = self.get_grpc_connection(&namenode_addrs).await?;
         match namenode_client
             .connection(tonic::Request::new(connection_request))
             .await
         {
-            Ok(connected) => Ok(connected.into_inner().connected),
+            Ok(connected) => {
+                info!("Connected to namenode sucessfully");
+                Ok(connected.into_inner().connected)
+            }
             Err(tonic_status) => {
+                error!(error = ?tonic_status,"Error while connecting to namenode");
                 Err(format!("Error while connecting to namenode {}", tonic_status).into())
             }
         }

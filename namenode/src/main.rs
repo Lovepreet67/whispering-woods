@@ -14,26 +14,28 @@ use proto::generated::{
     datanode_namenode::datanode_namenode_server::DatanodeNamenodeServer,
 };
 use state_mantainer::StateMantainer;
-use std::{env, error::Error, sync::Arc};
+use std::{error::Error, sync::Arc};
 use tokio::sync::Mutex;
 use tonic::transport::Server;
 use utilities::logger::{Level, error, info, init_logger, span};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let args: Vec<String> = env::args().collect();
-    let grpc_port = if args.len() > 1 {
-        args[1].clone()
-    } else {
-        "3000".to_owned()
-    };
-    let _gaurd = init_logger("Namenode", &grpc_port);
-    let root_span = span!(Level::INFO, "root", service = "Namenode",node_id=%grpc_port);
+    let env = std::env::var("ENV").unwrap_or("local".to_owned());
+    let self_base_addrs = std::env::var("BASE_URL").unwrap_or("127.0.0.1".to_owned());
+    let grpc_port = std::env::var("GRPC_PORT").unwrap_or("3000".to_owned());
+    let namenode_id = std::env::var("NAMENODE_ID").unwrap_or(format!("namenode_{grpc_port}"));
+    let _gaurd = init_logger("Namenode", &namenode_id);
+    let root_span = span!(Level::INFO, "root", service = "Namenode",node_id=%namenode_id);
     let _entered = root_span.enter();
-    let addr = format!("127.0.0.1:{}", grpc_port).parse()?;
+    let addr = format!("{self_base_addrs}:{grpc_port}");
     info!("Starting the grpc server on address : {addr}");
-    info!("Creating a ledger");
-    let ledger = match DefaultLedger::new("./temp/namenode/history.log").await {
+    let ledger_file = match &env[..] {
+        "local" => "./temp/namenode/history.log",
+        _ => "/state/history.log",
+    };
+    info!(path=%ledger_file,"Creating a ledger");
+    let ledger = match DefaultLedger::new(ledger_file).await {
         Ok(v) => v,
         Err(e) => {
             error!(error=%e,"Error while intiating the ledger Hence shuting down");
@@ -59,7 +61,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .add_service(DatanodeNamenodeServer::new(DatanodeHandler::new(
             state.clone(),
         )))
-        .serve(addr)
+        .serve(format!("0.0.0.0:{grpc_port}").parse()?)
         .await?;
     Ok(())
 }

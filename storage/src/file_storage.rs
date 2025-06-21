@@ -2,7 +2,7 @@ use std::{
     error::Error,
     path::{Path, PathBuf},
 };
-use tracing::{debug, error, info, trace};
+use tracing::{debug, error, info};
 
 use crate::storage::Storage;
 use tokio::{
@@ -17,14 +17,13 @@ pub struct FileStorage {
 impl FileStorage {
     pub fn new(root: String) -> Self {
         match std::fs::create_dir_all(&root) {
-            Ok(_v)=>{
+            Ok(_v) => {
                 info!(%root,"Created root for storage");
             }
-            Err(e)=>{
+            Err(e) => {
                 error!(%root,error=%e,"Error while creating the root for storage");
                 panic!("Error during creating directory")
             }
-            
         }
         FileStorage { root }
     }

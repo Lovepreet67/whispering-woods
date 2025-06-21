@@ -31,7 +31,6 @@ impl DatanodeService {
         datanode_addrs: &str,
         chunk_id: &str,
     ) -> Result<bool, Box<dyn Error + Send + Sync>> {
-        debug!("got delete request");
         let request = DeleteChunkRequest {
             id: chunk_id.to_owned(),
         };

@@ -25,6 +25,9 @@ pub struct DefaultLedger {
 impl DefaultLedger {
     pub async fn new(log_store: &str) -> Result<Self, Box<dyn Error>> {
         let (tx, mut rx) = mpsc::channel::<String>(16);
+        if let Some(parent) = std::path::Path::new(&log_store).parent() {
+            tokio::fs::create_dir_all(parent).await?;
+        }
         let mut appendable = tokio::fs::File::options()
             .append(true)
             .create(true)
@@ -98,7 +101,6 @@ impl Replayer for DefaultLedger {
         debug!("created Buf reader");
         let mut state = NamenodeState::new();
         for log in logs {
-            debug!("iterating over logs");
             // we got the log entry
             let parts: Vec<&str> = log.split(' ').collect();
             if parts.len() >= 3 {
