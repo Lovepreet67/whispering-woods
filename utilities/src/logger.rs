@@ -10,12 +10,14 @@ pub use tracing;
 pub use tracing::*;
 
 pub fn init_logger(service_name: &str, node_id: &str) -> WorkerGuard {
+    let env = std::env::var("ENV").unwrap_or("local".to_owned());
+    let log_base = match &env[..] {
+        "local" => "/Users/lovepreetsingh/Library/Logs/whispiring_woods",
+        _ => "logs",
+    };
     let file_appender = RollingFileAppender::new(
         Rotation::NEVER,
-        format!(
-            "/Users/lovepreetsingh/Library/Logs/whispiring_woods/{}",
-            service_name
-        ),
+        format!("{log_base}/{}", service_name),
         format!("{}.log", node_id),
     );
     let (non_blocking, _gaurd) = tracing_appender::non_blocking(file_appender);
