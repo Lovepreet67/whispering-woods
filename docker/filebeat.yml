@@ -1,0 +1,13 @@
+filebeat.inputs:
+  - type: log
+    enabled: true
+    paths:
+      - "/app/logs/**/*.log"
+    json.keys_under_root: true
+    json.add_error_key: true
+output.elasticsearch:
+  hosts: ["${ES_HOST:http://host.docker.internal:9200}"]
+  username: "elastic"
+  password: ""  # Leave blank if xpack security is disabled
+
+setup.ilm.enabled: false

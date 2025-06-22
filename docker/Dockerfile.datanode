@@ -1,0 +1,35 @@
+
+FROM rust:latest as builder
+
+WORKDIR /usr/src/app
+RUN cargo new --bin base_with_dependencies
+
+COPY . .
+
+ENV SKIP_PROTO_BUILD=1
+RUN cargo build --release --bin datanode 
+
+# --- Final runtime image ---
+FROM debian:bookworm-slim
+
+WORKDIR /app
+
+# Install dependencies
+RUN apt-get update && apt-get install -y curl gnupg && \
+    curl -fsSL https://artifacts.elastic.co/GPG-KEY-elasticsearch | gpg --dearmor -o /usr/share/keyrings/elastic.gpg && \
+    echo "deb [signed-by=/usr/share/keyrings/elastic.gpg] https://artifacts.elastic.co/packages/8.x/apt stable main" | tee -a /etc/apt/sources.list.d/elastic-8.x.list && \
+    apt-get update && apt-get install -y filebeat && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Copy the Rust binary
+COPY --from=builder /usr/src/app/target/release/datanode .
+
+# Copy Filebeat config
+COPY ./docker/filebeat.yml /etc/filebeat/filebeat.yml
+
+EXPOSE 3000
+EXPOSE 3001
+
+# Default CMD runs your app + Filebeat
+CMD ["sh", "-c", "./datanode & filebeat -e"]
+
