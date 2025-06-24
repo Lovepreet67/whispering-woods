@@ -25,12 +25,19 @@ use utilities::logger::{Instrument, Level, error, info, init_logger, span, trace
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let env = std::env::var("ENV").unwrap_or("local".to_owned());
-    let self_base_url = std::env::var("BASE_URL").unwrap_or("127.0.0.1".to_owned());
-    let grpc_port = std::env::var("GRPC_PORT").unwrap_or("3000".to_owned());
-    let tcp_port = std::env::var("TCP_PORT").unwrap_or("3001".to_owned());
+
+    // For now we are using default port only
+    let grpc_port = std::env::var("INTERNAL_GRPC_PORT").unwrap_or("3000".to_owned());
+    let tcp_port = std::env::var("INTERNAL_TCP_PORT").unwrap_or("3001".to_owned());
+
+    let external_grpc_addrs =
+        std::env::var("EXTERNAL_GRPC_ADDRS").unwrap_or(format!("http://127.0.0.1:{}", grpc_port));
+    let external_tcp_addrs =
+        std::env::var("EXTERNAL_TCP_ADDRS").unwrap_or(format!("127.0.0.1:{}", tcp_port));
+
     let datanode_id = std::env::var("NODE_ID").unwrap_or(grpc_port.clone());
     let _gaurd = init_logger("Datanode", &datanode_id);
-    let root_span = span!(Level::INFO, "root", service = "Datanode",%env,node_id=%grpc_port);
+    let root_span = span!(Level::INFO, "root", service = "Datanode",%env,node_id=%datanode_id);
     let _entered = root_span.enter();
     let namenode_addrs = match std::env::var("NAMENODE_ADDRS") {
         Ok(v) => v,
@@ -39,13 +46,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
             return Err("Error while getting namenode addrs".into());
         }
     };
-    let grpc_addr = format!("http://{self_base_url}:{grpc_port}");
-    let tcp_addr = format!("{self_base_url}:{tcp_port}");
-    info!("Starting the grpc server on address : {grpc_addr}");
+    info!("Starting the grpc server on address : {external_grpc_addrs}");
     let state = Arc::new(Mutex::new(DatanodeState::new(
         datanode_id.clone(),
-        grpc_addr.clone(),
-        tcp_addr.clone(),
+        external_grpc_addrs.clone(),
+        external_tcp_addrs.clone(),
         namenode_addrs,
     )));
     let ch = ClientHandler::new(state.clone());
@@ -57,7 +62,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     };
     info!(%storage_path,"Creating storage");
     let store = file_storage::FileStorage::new(storage_path);
-    info!(%grpc_addr,"Creating grpc server");
+    info!(grpc_addr = %external_grpc_addrs,"Creating grpc server");
     let grpc_server = Server::builder()
         .add_service(ClientDataNodeServer::new(ch))
         .add_service(PeerServer::new(ph))
@@ -66,9 +71,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
         )))
         .serve(format!("0.0.0.0:{grpc_port}").parse()?);
     tokio::spawn(grpc_server.instrument(root_span.clone()));
-    info!(%grpc_addr,"grpc server is now running");
+    info!(grpc_addrs = %external_grpc_addrs,"grpc server is now running");
     // we will create storage which will be used by the tcp service to serve a file
-    info!(%tcp_addr,"Starting the tcp server");
+    info!(tcp_addrs = %external_tcp_addrs,"Starting the tcp server");
     let tcp_handler = tcp::service::TCPService::new(
         format!("0.0.0.0:{tcp_port}").clone(),
         store.clone(),
@@ -86,7 +91,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
         .instrument(root_span.clone()),
     );
-    info!(%tcp_addr,"TCP server is running now");
+    info!(tcp_addrs = %external_tcp_addrs,"TCP server is running now");
 
     // starting datanode state mantainer for datanode
     let state_mantainer = StateMantainer::new(store.clone(), state.clone());

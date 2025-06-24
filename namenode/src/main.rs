@@ -22,14 +22,14 @@ use utilities::logger::{Level, error, info, init_logger, span};
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let env = std::env::var("ENV").unwrap_or("local".to_owned());
-    let self_base_addrs = std::env::var("BASE_URL").unwrap_or("127.0.0.1".to_owned());
-    let grpc_port = std::env::var("GRPC_PORT").unwrap_or("3000".to_owned());
+    let grpc_port = std::env::var("INTERNAL_GRPC_PORT").unwrap_or("3000".to_owned());
+    let external_grpc_addrs =
+        std::env::var("EXTERNAL_GRPC_ADDRS").unwrap_or(format!("http://127.0.0.1:{}", grpc_port));
     let namenode_id = std::env::var("NAMENODE_ID").unwrap_or(format!("namenode_{grpc_port}"));
     let _gaurd = init_logger("Namenode", &namenode_id);
     let root_span = span!(Level::INFO, "root", service = "Namenode",node_id=%namenode_id);
     let _entered = root_span.enter();
-    let addr = format!("{self_base_addrs}:{grpc_port}");
-    info!("Starting the grpc server on address : {addr}");
+    info!("Starting the grpc server on address : {external_grpc_addrs}");
     let ledger_file = match &env[..] {
         "local" => "./temp/namenode/history.log",
         _ => "/state/history.log",
