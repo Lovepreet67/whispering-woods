@@ -53,15 +53,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
         external_tcp_addrs.clone(),
         namenode_addrs,
     )));
-    let ch = ClientHandler::new(state.clone());
-    let ph = peer::handler::PeerHandler::new(state.clone());
-    // first we will start grpc server
     let storage_path = match &env[..] {
         "local" => format!("./temp/{}", datanode_id),
         _ => "data".to_owned(),
     };
     info!(%storage_path,"Creating storage");
     let store = file_storage::FileStorage::new(storage_path);
+
+    let ch = ClientHandler::new(state.clone(), store.clone());
+    let ph = peer::handler::PeerHandler::new(state.clone(), store.clone());
+    // first we will start grpc server
     info!(grpc_addr = %external_grpc_addrs,"Creating grpc server");
     let grpc_server = Server::builder()
         .add_service(ClientDataNodeServer::new(ch))

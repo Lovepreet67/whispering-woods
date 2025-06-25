@@ -7,6 +7,7 @@ import "client_namenode.proto";
 service ClientDataNode {
   rpc Echo(EchoRequest) returns (EchoResponse);
   rpc StoreChunk(StoreChunkRequest) returns (StoreChunkResponse);
+  rpc CommitChunk(CommitChunkRequest) returns (CommitChunkResponse);
   rpc FetchChunk(FetchChunkRequest) returns (FetchChunkResponse);
 }
 
@@ -32,5 +33,13 @@ message FetchChunkRequest{
 
 message FetchChunkResponse{
   string address = 1;
+}
+
+message CommitChunkRequest{
+  string chunk_id = 1;
+}
+
+message CommitChunkResponse {
+  bool committed=1;
 }
 

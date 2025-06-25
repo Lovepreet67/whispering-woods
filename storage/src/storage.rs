@@ -7,6 +7,7 @@ pub trait Storage {
         chunk_id: String,
         chunk_stream: &mut (impl io::AsyncRead + Unpin),
     ) -> Result<u64, Box<dyn Error>>;
+    async fn commit(&self, chunk_id: String) -> Result<bool, Box<dyn Error>>;
     async fn read(
         &self,
         chunk_id: String,

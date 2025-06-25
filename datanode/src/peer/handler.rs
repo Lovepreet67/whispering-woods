@@ -1,22 +1,26 @@
 use std::{error::Error, sync::Arc};
 
 use proto::generated::datanode_datanode::{
-    CreatePipelineRequest, CreatePipelineResponse, peer_server::Peer,
+    CommitChunkRequest, CommitChunkResponse, CreatePipelineRequest, CreatePipelineResponse,
+    peer_server::Peer,
 };
+use storage::{file_storage::FileStorage, storage::Storage};
 use tokio::{net::TcpStream, sync::Mutex};
-use utilities::logger::{instrument, trace, tracing};
+use utilities::logger::{error, instrument, trace, tracing};
 
 use crate::{datanode_state::DatanodeState, peer::service::PeerService};
 pub struct PeerHandler {
     state: Arc<Mutex<DatanodeState>>,
     peer_service: PeerService,
+    store: FileStorage,
 }
 
 impl PeerHandler {
-    pub fn new(state: Arc<Mutex<DatanodeState>>) -> Self {
+    pub fn new(state: Arc<Mutex<DatanodeState>>, store: FileStorage) -> Self {
         Self {
             state,
             peer_service: PeerService::new(),
+            store,
         }
     }
     async fn get_tcp_connection(&self, addrs: &str) -> Result<TcpStream, Box<dyn Error>> {
@@ -70,10 +74,63 @@ impl Peer for PeerHandler {
             state
                 .chunk_to_pipline
                 .insert(create_pipeline_request.chunk_id.clone(), tcp_connection);
+            state.chunk_to_next_replica.insert(
+                create_pipeline_request.chunk_id.clone(),
+                create_pipeline_request.replica_set[1].addrs.clone(),
+            );
+
         }
         let response = CreatePipelineResponse {
             address: self.state.lock().await.tcp_server_addrs.clone(),
         };
         Ok(tonic::Response::new(response))
+    }
+    #[instrument(skip(self,request), fields(chunk_id = %request.get_ref().chunk_id))]
+    async fn commit_chunk(
+        &self,
+        request: tonic::Request<CommitChunkRequest>,
+    ) -> Result<tonic::Response<CommitChunkResponse>, tonic::Status> {
+        trace!("Got commit chunk request from peer");
+        let commit_chunk_request = request.into_inner();
+        let mut state = self.state.lock().await;
+        if let Some(next_replica_node_grpc) = state
+            .chunk_to_next_replica
+            .remove(&commit_chunk_request.chunk_id)
+        {
+            trace!("have next replica so transferring commit message");
+            drop(state); // droping state to remove lock
+            //send commit message to next_replica_node_grpc
+            let _committed = match self
+                .peer_service
+                .commit_chunk(&commit_chunk_request.chunk_id, &next_replica_node_grpc)
+                .await
+            {
+                Ok(v) => v,
+                Err(e) => {
+                    error!(error = %e,next_addrs=%next_replica_node_grpc,"Error while sending commit messag to next replica");
+                    return Err(tonic::Status::new(
+                        tonic::Code::Aborted,
+                        "Error while commiting message on next replica",
+                    ));
+                }
+            };
+        }
+        //else {
+        //    state.available_chunks
+        //}
+        trace!("committed successfully");
+        let committed = match self.store.commit(commit_chunk_request.chunk_id).await {
+            Ok(v) => v,
+            Err(e) => {
+                error!(error=%e,"Error while commiting chunk");
+                return Err(tonic::Status::new(
+                    tonic::Code::Internal,
+                    "Error while committing",
+                ));
+            }
+        };
+        trace!("commited successfully");
+        let commit_chunk_response = CommitChunkResponse { committed };
+        Ok(tonic::Response::new(commit_chunk_response))
     }
 }

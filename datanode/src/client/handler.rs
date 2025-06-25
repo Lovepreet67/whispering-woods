@@ -1,11 +1,13 @@
 use proto::generated::client_datanode::client_data_node_server::ClientDataNode;
 use proto::generated::client_datanode::{
-    EchoRequest, EchoResponse, FetchChunkRequest, FetchChunkResponse, StoreChunkRequest,
-    StoreChunkResponse,
+    CommitChunkRequest, CommitChunkResponse, EchoRequest, EchoResponse, FetchChunkRequest,
+    FetchChunkResponse, StoreChunkRequest, StoreChunkResponse,
 };
 use std::sync::Arc;
+use storage::file_storage::FileStorage;
+use storage::storage::Storage;
 use tokio::sync::Mutex;
-use utilities::logger::{debug, instrument, trace, tracing};
+use utilities::logger::{error, instrument, trace, tracing};
 use utilities::tcp_pool::TcpPool;
 
 use crate::datanode_state::DatanodeState;
@@ -15,13 +17,15 @@ pub struct ClientHandler {
     state: Arc<Mutex<DatanodeState>>,
     peer_service: PeerService,
     tcp_connection_pool: TcpPool,
+    store: FileStorage,
 }
 impl ClientHandler {
-    pub fn new(state: Arc<Mutex<DatanodeState>>) -> Self {
+    pub fn new(state: Arc<Mutex<DatanodeState>>, store: FileStorage) -> Self {
         Self {
             state,
             peer_service: PeerService {},
             tcp_connection_pool: TcpPool::new(),
+            store,
         }
     }
 }
@@ -74,7 +78,11 @@ impl ClientDataNode for ClientHandler {
             state
                 .chunk_to_pipline
                 .insert(store_request.chunk_id.clone(), tcp_connection);
-            debug!(
+            state.chunk_to_next_replica.insert(
+                store_request.chunk_id.clone(),
+                store_request.replica_set[1].addrs.clone(),
+            );
+            trace!(
                 "successfully established the tcp connection and stored in chunk to pipeline {:?}",
                 state.chunk_to_pipline
             );
@@ -83,6 +91,54 @@ impl ClientDataNode for ClientHandler {
             address: self.state.lock().await.tcp_server_addrs.clone(),
         };
         Ok(tonic::Response::new(response))
+    }
+    #[instrument(skip(self,request),fields(chunk_id =  %request.get_ref().chunk_id))]
+    async fn commit_chunk(
+        &self,
+        request: tonic::Request<CommitChunkRequest>,
+    ) -> Result<tonic::Response<CommitChunkResponse>, tonic::Status> {
+        trace!("Got commit chunk request from client");
+        let commit_chunk_request = request.into_inner();
+        let mut state = self.state.lock().await;
+        if let Some(next_replica_node_grpc) = state
+            .chunk_to_next_replica
+            .remove(&commit_chunk_request.chunk_id)
+        {
+            trace!("Have next chunk so sending commit to it again");
+            drop(state); // droping state to remove lock
+            //send commit message to next_replica_node_grpc
+            let _ = match self
+                .peer_service
+                .commit_chunk(&commit_chunk_request.chunk_id, &next_replica_node_grpc)
+                .await
+            {
+                Ok(v) => v,
+                Err(e) => {
+                    error!(error = %e,next_addrs=%next_replica_node_grpc,"Error while sending commit messag to next replica");
+                    return Err(tonic::Status::new(
+                        tonic::Code::Aborted,
+                        "Error while commiting message on next replica",
+                    ));
+                }
+            };
+        }
+        trace!("after if condition");
+        //else {
+        //    state.available_chunks
+        //}
+        let committed = match self.store.commit(commit_chunk_request.chunk_id).await {
+            Ok(v) => v,
+            Err(e) => {
+                error!(error=%e,"Error while commiting chunk");
+                return Err(tonic::Status::new(
+                    tonic::Code::Internal,
+                    "Error while committing",
+                ));
+            }
+        };
+        trace!("commited successfully");
+        let commit_chunk_response = CommitChunkResponse { committed };
+        Ok(tonic::Response::new(commit_chunk_response))
     }
     #[instrument(skip(self,request),fields(chunk_id = %request.get_ref().chunk_id))]
     async fn fetch_chunk(

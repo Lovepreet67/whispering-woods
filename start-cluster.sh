@@ -42,6 +42,7 @@ for ((i = 1; i <= DATANODE_COUNT; i++)); do
     --name gfs-datanode-$i \
     -p ${grpc_port}:3000 \
     -p ${tcp_port}:3001 \
+    -e ENV=$ENV \
     -e NODE_ID=datanode_$i \
     -e INTERNAL_GRPC_PORT=3000 \
     -e EXTERNAL_GRPC_ADDRS=http://host.docker.internal:${grpc_port} \

@@ -2,7 +2,7 @@ use std::{error::Error, str::FromStr, time::Duration};
 
 use proto::generated::{
     client_namenode::DataNodeMeta,
-    datanode_datanode::{CreatePipelineRequest, peer_client::PeerClient},
+    datanode_datanode::{CommitChunkRequest, CreatePipelineRequest, peer_client::PeerClient},
 };
 use tonic::transport::{Channel, Endpoint};
 use utilities::logger::{instrument, trace, tracing};
@@ -53,5 +53,15 @@ impl PeerService {
         })?;
         let create_pipelince_response = response.get_ref();
         Ok(create_pipelince_response.address.to_owned())
+    }
+    pub async fn commit_chunk(&self, chunk_id: &str, addrs: &str) -> Result<bool, Box<dyn Error>> {
+        let commit_chunk_request = CommitChunkRequest {
+            chunk_id: chunk_id.to_owned(),
+        };
+        let mut client = self.get_grpc_connection(addrs).await?;
+        let request = tonic::Request::new(commit_chunk_request);
+        let response = client.commit_chunk(request).await?;
+        let commit_chunk_response = response.into_inner();
+        Ok(commit_chunk_response.committed)
     }
 }

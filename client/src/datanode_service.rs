@@ -2,7 +2,7 @@ use std::{error::Error, str::FromStr, time::Duration};
 
 use proto::generated::{
     client_datanode::{
-        FetchChunkRequest, StoreChunkRequest, client_data_node_client::ClientDataNodeClient,
+        client_data_node_client::ClientDataNodeClient, CommitChunkRequest, FetchChunkRequest, StoreChunkRequest
     },
     client_namenode::DataNodeMeta,
 };
@@ -67,6 +67,12 @@ impl DatanodeService {
         tcp_stream.write_u8(1).await?;
         trace!("writing chunk to stream");
         tokio::io::copy(read_stream, &mut tcp_stream).await?;
+        trace!("Sending commit message");
+        let commit_chunk_request = CommitChunkRequest {
+            chunk_id
+        };
+        data_node_grpc_client.commit_chunk(tonic::Request::new(commit_chunk_request)).await?;
+        trace!("committed successfully");
         Ok(())
     }
     #[instrument(skip(self))]

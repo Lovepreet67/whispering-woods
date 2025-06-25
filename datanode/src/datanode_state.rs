@@ -10,6 +10,7 @@ pub struct DatanodeState {
     pub namenode_addrs: String,
     pub available_storage: usize,
     pub available_chunks: Vec<String>,
+    pub chunk_to_next_replica: HashMap<String, String>, // this will store the address of next
 }
 impl DatanodeState {
     pub fn new(
@@ -26,6 +27,7 @@ impl DatanodeState {
             namenode_addrs,
             available_storage: 0,
             available_chunks: vec![],
+            chunk_to_next_replica: HashMap::default(),
         }
     }
     pub fn get_id(&self) -> String {

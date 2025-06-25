@@ -11,6 +11,16 @@ pub struct CreatePipelineResponse {
     #[prost(string, tag = "1")]
     pub address: ::prost::alloc::string::String,
 }
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct CommitChunkRequest {
+    #[prost(string, tag = "1")]
+    pub chunk_id: ::prost::alloc::string::String,
+}
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct CommitChunkResponse {
+    #[prost(bool, tag = "1")]
+    pub committed: bool,
+}
 /// Generated client implementations.
 pub mod peer_client {
     #![allow(
@@ -126,6 +136,30 @@ pub mod peer_client {
                 .insert(GrpcMethod::new("datanode_datanode.Peer", "CreatePipeline"));
             self.inner.unary(req, path, codec).await
         }
+        pub async fn commit_chunk(
+            &mut self,
+            request: impl tonic::IntoRequest<super::CommitChunkRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::CommitChunkResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/datanode_datanode.Peer/CommitChunk",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(GrpcMethod::new("datanode_datanode.Peer", "CommitChunk"));
+            self.inner.unary(req, path, codec).await
+        }
     }
 }
 /// Generated server implementations.
@@ -146,6 +180,13 @@ pub mod peer_server {
             request: tonic::Request<super::CreatePipelineRequest>,
         ) -> std::result::Result<
             tonic::Response<super::CreatePipelineResponse>,
+            tonic::Status,
+        >;
+        async fn commit_chunk(
+            &self,
+            request: tonic::Request<super::CommitChunkRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::CommitChunkResponse>,
             tonic::Status,
         >;
     }
@@ -255,6 +296,49 @@ pub mod peer_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let method = CreatePipelineSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/datanode_datanode.Peer/CommitChunk" => {
+                    #[allow(non_camel_case_types)]
+                    struct CommitChunkSvc<T: Peer>(pub Arc<T>);
+                    impl<T: Peer> tonic::server::UnaryService<super::CommitChunkRequest>
+                    for CommitChunkSvc<T> {
+                        type Response = super::CommitChunkResponse;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::CommitChunkRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as Peer>::commit_chunk(&inner, request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let method = CommitChunkSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
