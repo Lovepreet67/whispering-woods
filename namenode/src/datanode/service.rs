@@ -4,7 +4,7 @@ use proto::generated::namenode_datanode::{
     DeleteChunkRequest, namenode_datanode_client::NamenodeDatanodeClient,
 };
 use tonic::transport::{Channel, Endpoint};
-use utilities::logger::debug;
+use utilities::{grpc_channel_pool::GRPC_CHANNEL_POOL, logger::debug};
 
 #[derive(Clone, Copy)]
 pub struct DatanodeService {}
@@ -16,14 +16,8 @@ impl DatanodeService {
     async fn get_connection(
         addrs: &str,
     ) -> Result<NamenodeDatanodeClient<Channel>, Box<dyn Error + Send + Sync>> {
-        let endpoint = Endpoint::from_str(addrs)
-            .map_err(|e| format!("Error while creating endpoint {:?}", e))?
-            .connect_timeout(Duration::from_secs(5));
-        let chanel = endpoint
-            .connect()
-            .await
-            .map_err(|e| format!("Error while connecting to given address {:?}", e))?;
-        Ok(NamenodeDatanodeClient::new(chanel))
+        let channel = GRPC_CHANNEL_POOL.get_channel(addrs).await.unwrap();
+        Ok(NamenodeDatanodeClient::new(channel))
     }
 
     pub async fn delete_chunk(

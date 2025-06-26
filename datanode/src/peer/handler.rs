@@ -78,7 +78,6 @@ impl Peer for PeerHandler {
                 create_pipeline_request.chunk_id.clone(),
                 create_pipeline_request.replica_set[1].addrs.clone(),
             );
-
         }
         let response = CreatePipelineResponse {
             address: self.state.lock().await.tcp_server_addrs.clone(),

@@ -6,7 +6,7 @@ use proto::generated::datanode_namenode::{
 };
 use tokio::sync::Mutex;
 use tonic::transport::{Channel, Endpoint};
-use utilities::logger::{error, info, trace};
+use utilities::{grpc_channel_pool::GRPC_CHANNEL_POOL, logger::{error, info, trace}};
 
 use crate::datanode_state::DatanodeState;
 
@@ -21,15 +21,7 @@ impl NamenodeService {
         &self,
         addrs: &str,
     ) -> Result<DatanodeNamenodeClient<Channel>, Box<dyn Error>> {
-        let endpoint = Endpoint::from_str(addrs)
-            .map_err(|e| format!("Error while creating endpoint {}", e))?
-            .connect_timeout(Duration::from_secs(5));
-        let channel = endpoint.connect().await.map_err(|e| {
-            format!(
-                "error while connecting to namenode at addrs : {} , error : {}",
-                addrs, e
-            )
-        })?;
+        let channel = GRPC_CHANNEL_POOL.get_channel(addrs).await.unwrap();
         Ok(DatanodeNamenodeClient::new(channel))
     }
 

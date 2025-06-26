@@ -1,41 +1,20 @@
-use std::{error::Error, time::Duration};
+use std::error::Error;
 
 use proto::generated::client_namenode::{
     ChunkMeta, DeleteFileRequest, FetchFileRequest, StoreFileRequest,
     client_name_node_client::ClientNameNodeClient,
 };
-use tonic::transport::{Channel, Endpoint};
-use utilities::logger::{debug, info, instrument, tracing};
+use tonic::transport::Channel;
+use utilities::logger::{debug, instrument, tracing};
 
 #[derive(Clone, Debug)]
 pub struct NamenodeService {
-    //address: String,
     connection: ClientNameNodeClient<Channel>,
 }
 
 impl NamenodeService {
-    pub async fn new(addrs: String) -> Self {
-        info!("connecting namenode at {:?}", addrs);
-        let connection = Self::get_connection(addrs.clone()).await.unwrap();
-        Self {
-            //address: addrs,
-            connection,
-        }
-    }
-    async fn get_connection(
-        addrs: String,
-    ) -> Result<ClientNameNodeClient<Channel>, Box<dyn Error>> {
-        let endpoint = Endpoint::from_shared(addrs.clone())
-            .map_err(|e| format!("Error while creating endpoint {:?}", e))?
-            .keep_alive_timeout(Duration::from_secs(60))
-            .tcp_keepalive(Some(Duration::from_secs(60)))
-            .connect_timeout(Duration::from_secs(5));
-        let chanel = endpoint
-            .connect()
-            .await
-            .map_err(|e| format!("Error while connecting to given address {:?}", e))?;
-        info!("Connected to namenode successfully");
-        Ok(ClientNameNodeClient::new(chanel))
+    pub fn new(connection: ClientNameNodeClient<Channel>) -> Self {
+        Self { connection }
     }
     #[instrument(skip(self))]
     pub async fn store_file(

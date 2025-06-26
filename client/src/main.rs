@@ -1,7 +1,10 @@
 use std::{error::Error, io};
 
 use command_runner::CommandRunner;
-use utilities::logger::{self, Level, error, info, span};
+use proto::generated::client_namenode::client_name_node_client::ClientNameNodeClient;
+use utilities::{grpc_channel_pool::GRPC_CHANNEL_POOL, 
+    logger::{self, error, info, span, Level}}
+;
 mod command_runner;
 mod datanode_service;
 mod file_chunker;
@@ -20,21 +23,30 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     };
     info!(namenode_addrs = %namenode_addrs,"starting the Client");
-    let namenode = namenode_service::NamenodeService::new(namenode_addrs).await;
+    info!("connecting to namenode");
+    let namenode_channel = match GRPC_CHANNEL_POOL.get_channel(&namenode_addrs).await {
+        Ok(v) => v,
+        Err(e) => {
+            error!(error = %e,"Error while creating namnode channel so shutting down");
+            return Err(e);
+        }
+    };
+    let namenode =
+        namenode_service::NamenodeService::new(ClientNameNodeClient::new(namenode_channel));
     let mut command_executer = CommandRunner::new(namenode);
     loop {
         let mut input = String::new();
         match io::stdin().read_line(&mut input) {
             Ok(_bytes) => match command_executer.handle_input(&mut input).await {
                 Ok(message) => {
-                    println!("Success : {}", message);
+                    info!("Success : {}", message);
                 }
                 Err(message) => {
-                    println!("Error : {}", message);
+                    error!("Error : {}", message);
                 }
             },
             Err(e) => {
-                println!("error while reading the command {:?}", e);
+                error!("error while reading the command {:?}", e);
             }
         }
     }

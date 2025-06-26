@@ -1,7 +1,7 @@
 use std::error::Error;
 
 use tokio::io::copy;
-use utilities::logger::{error, instrument, trace, tracing};
+use utilities::logger::{error, info, instrument, trace, tracing};
 
 use crate::{datanode_service::DatanodeService, namenode_service::NamenodeService};
 
@@ -26,7 +26,7 @@ impl FetchFileHandler {
         let mut target_file = tokio::fs::File::options()
             .append(true)
             .create(true)
-            .open(local_file_name)
+            .open(local_file_name.clone())
             .await?;
         trace!("opened file in append only mode");
         for chunk_detail in &chunk_details {
@@ -45,6 +45,8 @@ impl FetchFileHandler {
                 }
                 Err(e) => {
                     error!(error = %e,"Error during chunk fetching");
+                    info!("Removing the created file becuase error happend");
+                    tokio::fs::remove_file(local_file_name).await?;
                     return Err(e);
                 }
             }

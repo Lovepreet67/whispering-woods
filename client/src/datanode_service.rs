@@ -1,16 +1,16 @@
-use std::{error::Error, str::FromStr, time::Duration};
+use std::error::Error;
 
 use proto::generated::{
     client_datanode::{
-        client_data_node_client::ClientDataNodeClient, CommitChunkRequest, FetchChunkRequest, StoreChunkRequest
+        CommitChunkRequest, FetchChunkRequest, StoreChunkRequest,
+        client_data_node_client::ClientDataNodeClient,
     },
     client_namenode::DataNodeMeta,
 };
 use tokio::io::{AsyncRead, AsyncWriteExt};
-use tonic::transport::{Channel, Endpoint};
+use tonic::transport::Channel;
 use utilities::{
-    logger::{instrument, trace, tracing},
-    tcp_pool::TcpPool,
+    grpc_channel_pool::GRPC_CHANNEL_POOL, logger::{instrument, trace, tracing}, tcp_pool::TcpPool
 };
 
 #[derive(Debug)]
@@ -20,21 +20,14 @@ pub struct DatanodeService {
 impl DatanodeService {
     pub fn new() -> Self {
         Self {
-            tcp_connection_pool: TcpPool::new(),
+            tcp_connection_pool: TcpPool::new()
         }
     }
     async fn get_grpc_connection(
         &self,
         addrs: &str,
     ) -> Result<ClientDataNodeClient<Channel>, Box<dyn Error>> {
-        trace!("Getting grpc connection addrs : {}", addrs);
-        let endpoint = Endpoint::from_str(addrs)
-            .map_err(|e| format!("Error while creating an endpoint {}", e))?
-            .connect_timeout(Duration::from_secs(5));
-        let channel = endpoint
-            .connect()
-            .await
-            .map_err(|e| format!("Error while connecting to address {:?}", e))?;
+        let channel = GRPC_CHANNEL_POOL.get_channel(addrs).await.unwrap();
         Ok(ClientDataNodeClient::new(channel))
     }
     #[instrument(skip(self, read_stream))]
@@ -68,10 +61,10 @@ impl DatanodeService {
         trace!("writing chunk to stream");
         tokio::io::copy(read_stream, &mut tcp_stream).await?;
         trace!("Sending commit message");
-        let commit_chunk_request = CommitChunkRequest {
-            chunk_id
-        };
-        data_node_grpc_client.commit_chunk(tonic::Request::new(commit_chunk_request)).await?;
+        let commit_chunk_request = CommitChunkRequest { chunk_id };
+        data_node_grpc_client
+            .commit_chunk(tonic::Request::new(commit_chunk_request))
+            .await?;
         trace!("committed successfully");
         Ok(())
     }
