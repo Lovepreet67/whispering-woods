@@ -1,5 +1,6 @@
-use std::{collections::HashMap, error::Error, str::FromStr, sync::Arc, time::Duration};
+use std::{collections::HashMap, str::FromStr, sync::Arc, time::Duration};
 
+use crate::result::Result;
 use crate::retry_policy::retry_with_backoff;
 use tokio::sync::Mutex;
 use tonic::transport::{Channel, Endpoint};
@@ -15,7 +16,7 @@ impl GrpcChannelPool {
             store: Arc::default(),
         }
     }
-    pub async fn get_channel(&self, addrs: &str) -> Result<Channel, Box<dyn Error>> {
+    pub async fn get_channel(&self, addrs: &str) -> Result<Channel> {
         if let Some(chnl) = self.store.lock().await.get(addrs) {
             trace!("Channel already present");
             return Ok(chnl.clone());
@@ -48,4 +49,4 @@ impl GrpcChannelPool {
 }
 
 pub static GRPC_CHANNEL_POOL: once_cell::sync::Lazy<GrpcChannelPool> =
-    once_cell::sync::Lazy::new(|| GrpcChannelPool::new());
+    once_cell::sync::Lazy::new(GrpcChannelPool::new);

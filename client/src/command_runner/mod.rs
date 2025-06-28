@@ -7,6 +7,7 @@ use delete_file_handler::DeleteFileHandler;
 use fetch_file_handler::FetchFileHandler;
 use std::error::Error;
 use store_file_handler::StoreFileHandler;
+use utilities::result::Result;
 
 pub struct CommandRunner {
     store_file_handler: StoreFileHandler,
@@ -21,7 +22,7 @@ impl CommandRunner {
             delete_file_handler: DeleteFileHandler::new(namenode),
         }
     }
-    pub async fn handle_input(&mut self, command: &mut str) -> Result<String, Box<dyn Error>> {
+    pub async fn handle_input(&mut self, command: &mut str) -> Result<String> {
         match command {
             fetch_command if fetch_command.starts_with("fetch") => {
                 let inputs: Vec<&str> = fetch_command.split_whitespace().collect();

@@ -1,8 +1,8 @@
-use std::error::Error;
-
-use utilities::logger::{instrument, trace, tracing};
-
 use crate::namenode_service::NamenodeService;
+use utilities::{
+    logger::{instrument, trace, tracing},
+    result::Result,
+};
 
 #[derive(Debug)]
 pub struct DeleteFileHandler {
@@ -13,10 +13,7 @@ impl DeleteFileHandler {
         Self { namenode }
     }
     #[instrument(skip(self))]
-    pub async fn delete_file(
-        &mut self,
-        remote_file_name: String,
-    ) -> Result<String, Box<dyn Error>> {
+    pub async fn delete_file(&mut self, remote_file_name: String) -> Result<String> {
         trace!("sending a delete file request to the namenode");
         let delete_node = self.namenode.delete_file(remote_file_name).await?;
         if !delete_node {

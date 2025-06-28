@@ -1,10 +1,9 @@
-use std::error::Error;
-
 use proto::generated::client_namenode::ChunkMeta;
 use tokio::{
     fs::OpenOptions,
     io::{AsyncRead, AsyncReadExt, AsyncSeekExt},
 };
+use utilities::result::Result;
 
 pub struct FileChunker<'a> {
     file_path: String,
@@ -20,7 +19,7 @@ impl<'a> FileChunker<'a> {
             current_index: 0,
         }
     }
-    pub async fn next_chunk(&mut self) -> Result<impl AsyncRead + Unpin, Box<dyn Error>> {
+    pub async fn next_chunk(&mut self) -> Result<impl AsyncRead + Unpin> {
         let mut chunk_header = OpenOptions::new()
             .read(true)
             .open(self.file_path.clone())

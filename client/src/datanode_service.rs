@@ -10,23 +10,19 @@ use proto::generated::{
 use tokio::io::{AsyncRead, AsyncWriteExt};
 use tonic::transport::Channel;
 use utilities::{
-    grpc_channel_pool::GRPC_CHANNEL_POOL, logger::{instrument, trace, tracing}, tcp_pool::TcpPool
+    grpc_channel_pool::GRPC_CHANNEL_POOL,
+    logger::{instrument, trace, tracing},
+    result::Result,
+    tcp_pool::TCP_CONNECTION_POOL,
 };
 
-#[derive(Debug)]
-pub struct DatanodeService {
-    tcp_connection_pool: TcpPool,
-}
+#[derive(Clone, Debug)]
+pub struct DatanodeService {}
 impl DatanodeService {
     pub fn new() -> Self {
-        Self {
-            tcp_connection_pool: TcpPool::new()
-        }
+        Self {}
     }
-    async fn get_grpc_connection(
-        &self,
-        addrs: &str,
-    ) -> Result<ClientDataNodeClient<Channel>, Box<dyn Error>> {
+    async fn get_grpc_connection(&self, addrs: &str) -> Result<ClientDataNodeClient<Channel>> {
         let channel = GRPC_CHANNEL_POOL.get_channel(addrs).await.unwrap();
         Ok(ClientDataNodeClient::new(channel))
     }
@@ -36,7 +32,7 @@ impl DatanodeService {
         chunk_id: String,
         replica_set: Vec<DataNodeMeta>,
         read_stream: &mut (impl AsyncRead + Unpin),
-    ) -> Result<(), Box<dyn Error>> {
+    ) -> Result<()> {
         if replica_set.is_empty() {
             return Err("Empty replica set".into());
         }
@@ -53,7 +49,7 @@ impl DatanodeService {
         let tcp_addrs = &store_chunk_response.get_ref().address;
         trace!(%tcp_addrs,"Got tcp address");
         // connect to tcp stream and push data as [chunk_id,write_mode,bytes from stream]
-        let mut tcp_stream = self.tcp_connection_pool.get_connection(tcp_addrs).await?;
+        let mut tcp_stream = TCP_CONNECTION_POOL.get_connection(tcp_addrs).await?;
         trace!("writing chunk_id");
         tcp_stream.write_all(chunk_id.as_bytes()).await?;
         trace!("writing mode to file");
@@ -73,7 +69,7 @@ impl DatanodeService {
         &self,
         chunk_id: String,
         datanode_addrs: String,
-    ) -> Result<impl AsyncRead + Unpin, Box<dyn Error>> {
+    ) -> Result<impl AsyncRead + Unpin + Send + Sync> {
         let fetch_chunk_request = FetchChunkRequest {
             chunk_id: chunk_id.clone(),
         };
@@ -85,8 +81,7 @@ impl DatanodeService {
             .await?
             .into_inner();
         trace!(tcp_addrs = %fetch_chunk_response.address,"Got tcp stream addres for datanode");
-        let mut tcp_stream = self
-            .tcp_connection_pool
+        let mut tcp_stream = TCP_CONNECTION_POOL
             .get_connection(&fetch_chunk_response.address)
             .await?;
         trace!("writing chunk id");

@@ -1,12 +1,15 @@
-use std::{error::Error, str::FromStr, sync::Arc, time::Duration};
+use std::{error::Error, sync::Arc};
 
 use proto::generated::datanode_namenode::{
     ConnectionRequest, HeartBeatRequest, StateSyncRequest,
     datanode_namenode_client::DatanodeNamenodeClient,
 };
 use tokio::sync::Mutex;
-use tonic::transport::{Channel, Endpoint};
-use utilities::{grpc_channel_pool::GRPC_CHANNEL_POOL, logger::{error, info, trace}};
+use tonic::transport::Channel;
+use utilities::{
+    grpc_channel_pool::GRPC_CHANNEL_POOL,
+    logger::{error, info, trace},
+};
 
 use crate::datanode_state::DatanodeState;
 

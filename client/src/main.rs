@@ -2,15 +2,17 @@ use std::{error::Error, io};
 
 use command_runner::CommandRunner;
 use proto::generated::client_namenode::client_name_node_client::ClientNameNodeClient;
-use utilities::{grpc_channel_pool::GRPC_CHANNEL_POOL, 
-    logger::{self, error, info, span, Level}}
-;
+use utilities::{
+    grpc_channel_pool::GRPC_CHANNEL_POOL,
+    logger::{self, Level, error, info, span},
+};
+mod chunk_joiner;
 mod command_runner;
 mod datanode_service;
 mod file_chunker;
 mod namenode_service;
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
+async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     let client_id = std::env::var("CLIENT_NAME").unwrap_or("Client_0".to_owned());
     let _gaurd = logger::init_logger("Client", &client_id);
     let root_span = span!(Level::INFO, "root", service = "Client",%client_id);

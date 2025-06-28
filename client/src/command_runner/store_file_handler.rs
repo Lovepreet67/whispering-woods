@@ -1,6 +1,7 @@
-use std::error::Error;
-
-use utilities::logger::{error, info, instrument, trace, tracing};
+use utilities::{
+    logger::{error, info, instrument, trace, tracing},
+    result::Result,
+};
 
 use crate::{
     datanode_service::DatanodeService, file_chunker::FileChunker, namenode_service::NamenodeService,
@@ -19,7 +20,7 @@ impl StoreFileHandler {
         &mut self,
         local_file_path: String,
         remote_file_name: String,
-    ) -> Result<String, Box<dyn Error>> {
+    ) -> Result<String> {
         // get the file metadata
         trace!("Fetching file metadata");
         let file_metadata = match tokio::fs::metadata(local_file_path.clone()).await {

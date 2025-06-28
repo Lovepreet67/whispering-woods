@@ -1,11 +1,12 @@
-use std::error::Error;
-
 use proto::generated::client_namenode::{
-    ChunkMeta, DeleteFileRequest, FetchFileRequest, StoreFileRequest,
+    ChunkMeta, DeleteFileRequest, FetchFileRequest, FetchFileResponse, StoreFileRequest,
     client_name_node_client::ClientNameNodeClient,
 };
 use tonic::transport::Channel;
-use utilities::logger::{debug, instrument, tracing};
+use utilities::{
+    logger::{debug, instrument, tracing},
+    result::Result,
+};
 
 #[derive(Clone, Debug)]
 pub struct NamenodeService {
@@ -21,7 +22,7 @@ impl NamenodeService {
         &mut self,
         file_name: String,
         file_size: u64,
-    ) -> Result<Vec<ChunkMeta>, Box<dyn Error>> {
+    ) -> Result<Vec<ChunkMeta>> {
         let store_file_request = StoreFileRequest {
             file_name: file_name.clone(),
             file_size,
@@ -40,10 +41,7 @@ impl NamenodeService {
             .into_inner();
         Ok(store_file_response.chunk_list.clone())
     }
-    pub async fn fetch_file(
-        &mut self,
-        file_name: String,
-    ) -> Result<Vec<ChunkMeta>, Box<dyn Error>> {
+    pub async fn fetch_file(&mut self, file_name: String) -> Result<FetchFileResponse> {
         let fetch_file_request = FetchFileRequest {
             file_name: file_name.clone(),
         };
@@ -59,9 +57,9 @@ impl NamenodeService {
                 )
             })?
             .into_inner();
-        Ok(fetch_file_response.chunk_list.clone())
+        Ok(fetch_file_response)
     }
-    pub async fn delete_file(&mut self, file_name: String) -> Result<bool, Box<dyn Error>> {
+    pub async fn delete_file(&mut self, file_name: String) -> Result<bool> {
         debug!("delete file for #{}#", file_name);
         let delete_file_request = DeleteFileRequest {
             file_name: file_name.clone(),
