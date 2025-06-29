@@ -1,5 +1,3 @@
-use std::error::Error;
-
 use proto::generated::{
     client_datanode::{
         CommitChunkRequest, FetchChunkRequest, StoreChunkRequest,
@@ -31,7 +29,7 @@ impl DatanodeService {
         &self,
         chunk_id: String,
         replica_set: Vec<DataNodeMeta>,
-        read_stream: &mut (impl AsyncRead + Unpin),
+        mut read_stream: (impl AsyncRead + Unpin),
     ) -> Result<()> {
         if replica_set.is_empty() {
             return Err("Empty replica set".into());
@@ -55,7 +53,7 @@ impl DatanodeService {
         trace!("writing mode to file");
         tcp_stream.write_u8(1).await?;
         trace!("writing chunk to stream");
-        tokio::io::copy(read_stream, &mut tcp_stream).await?;
+        tokio::io::copy(&mut read_stream, &mut tcp_stream).await?;
         trace!("Sending commit message");
         let commit_chunk_request = CommitChunkRequest { chunk_id };
         data_node_grpc_client

@@ -3,7 +3,12 @@ use tracing_appender::{
     non_blocking::WorkerGuard,
     rolling::{RollingFileAppender, Rotation},
 };
-use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
+use tracing_subscriber::{
+    EnvFilter,
+    fmt::{self, format::FmtSpan},
+    layer::SubscriberExt,
+    util::SubscriberInitExt,
+};
 
 // exporing the info! warn! etc tracing macro through this Library
 pub use tracing;
@@ -29,6 +34,7 @@ pub fn init_logger(service_name: &str, node_id: &str) -> WorkerGuard {
         .with_thread_names(true)
         .with_current_span(true)
         .with_target(true)
+        .with_span_events(FmtSpan::ENTER | FmtSpan::EXIT)
         .flatten_event(true);
     let stdout_layer = fmt::layer().with_writer(std::io::stdout);
     let filter = EnvFilter::builder()

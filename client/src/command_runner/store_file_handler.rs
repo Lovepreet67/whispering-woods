@@ -1,6 +1,7 @@
 use utilities::{
     logger::{error, info, instrument, trace, tracing},
     result::Result,
+    retry_policy::retry_with_backoff,
 };
 
 use crate::{
@@ -41,24 +42,50 @@ impl StoreFileHandler {
         trace!(?chunk_details, "got namenode response");
         let mut file_chunker = FileChunker::new(local_file_path.clone(), &chunk_details);
         // send each data node to setup pilepline
+        let mut handles = vec![];
         for chunk_detail in &chunk_details {
-            trace!(id = %chunk_detail.id,"working on chunk");
-            let mut read_stream = file_chunker.next_chunk().await?;
-            let res = self
-                .datanode
-                .store_chunk(
-                    chunk_detail.id.clone(),
-                    chunk_detail.location.clone(),
-                    &mut read_stream,
+            let datanode = self.datanode.clone();
+            let file_chunk = file_chunker.next_chunk().unwrap();
+            let chunk_detail = chunk_detail.clone();
+
+            handles.push(tokio::spawn(async move {
+                retry_with_backoff(
+                    || async {
+                        trace!(id = %chunk_detail.id,"working on chunk");
+                        let read_stream = file_chunk.get_read_stream().await?;
+                        let res = datanode
+                            .store_chunk(
+                                chunk_detail.id.clone(),
+                                chunk_detail.location.clone(),
+                                read_stream,
+                            )
+                            .await;
+                        match res {
+                            Ok(_) => Ok(()),
+                            Err(e) => {
+                                error!("{}", e);
+                                Err(e)
+                            }
+                        }
+                    },
+                    3,
                 )
-                .await;
-            match res {
+                .await
+            }));
+        }
+
+        for handle in handles {
+            match handle.await {
                 Ok(_) => {}
                 Err(e) => {
-                    error!("{}", e);
+                    error!(error=%e,"aborting the store file operation");
+                    // we will implement something to tell namenode that this file store has been
+                    // aborted
+                    return Err(e.into());
                 }
             }
         }
+        // if all things go well we will tell namenode to commit
         Ok("File stored successfully".to_owned())
     }
 }

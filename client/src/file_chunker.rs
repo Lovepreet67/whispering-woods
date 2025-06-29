@@ -5,6 +5,26 @@ use tokio::{
 };
 use utilities::result::Result;
 
+#[derive(Clone)]
+pub struct FileChunk {
+    file_path: String,
+    start_offset: u64,
+    end_offset: u64,
+}
+impl FileChunk {
+    pub async fn get_read_stream(&self) -> Result<impl AsyncRead + Unpin + Send + Sync> {
+        let mut file = OpenOptions::new()
+            .read(true)
+            .open(&self.file_path)
+            .await
+            .map_err(|e| format!("Error while openning the file for chunk {e:?}"))?;
+        file.seek(tokio::io::SeekFrom::Start(self.end_offset))
+            .await
+            .map_err(|e| format!("Error while seeking to starting offset {e:?}"))?;
+        Ok(file.take(self.end_offset - self.start_offset))
+    }
+}
+
 pub struct FileChunker<'a> {
     file_path: String,
     chunk_details: &'a Vec<ChunkMeta>,
@@ -19,36 +39,16 @@ impl<'a> FileChunker<'a> {
             current_index: 0,
         }
     }
-    pub async fn next_chunk(&mut self) -> Result<impl AsyncRead + Unpin> {
-        let mut chunk_header = OpenOptions::new()
-            .read(true)
-            .open(self.file_path.clone())
-            .await
-            .map_err(|e| {
-                format!(
-                    "Error while opening the file : {:} , error: {:?}",
-                    self.file_path, e
-                )
-            })?;
-
-        // Moving to the chunk header
-        chunk_header
-            .seek(std::io::SeekFrom::Start(
-                self.chunk_details[self.current_index].start_offset,
-            ))
-            .await
-            .map_err(|e| {
-                format!(
-                    "Error while creating the chunk header for chunk : {}, offset : {}, error : {}",
-                    self.current_index, self.chunk_details[self.current_index].start_offset, e
-                )
-            })?;
-
-        let tor = Ok(chunk_header.take(
-            self.chunk_details[self.current_index].end_offset
-                - self.chunk_details[self.current_index].start_offset,
-        ));
+    pub fn next_chunk(&mut self) -> Option<FileChunk> {
+        if self.current_index >= self.chunk_details.len() {
+            return None;
+        }
+        let index = self.current_index;
         self.current_index += 1;
-        tor
+        Some(FileChunk {
+            file_path: self.file_path.clone(),
+            start_offset: self.chunk_details[index].start_offset,
+            end_offset: self.chunk_details[index].end_offset,
+        })
     }
 }

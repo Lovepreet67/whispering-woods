@@ -5,7 +5,6 @@ mod store_file_handler;
 use crate::{datanode_service::DatanodeService, namenode_service::NamenodeService};
 use delete_file_handler::DeleteFileHandler;
 use fetch_file_handler::FetchFileHandler;
-use std::error::Error;
 use store_file_handler::StoreFileHandler;
 use utilities::result::Result;
 

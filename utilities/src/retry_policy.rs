@@ -1,5 +1,5 @@
 use crate::result::Result;
-use std::{error::Error, time::Duration};
+use std::time::Duration;
 use tokio::time::sleep;
 use tracing::{error, info};
 
