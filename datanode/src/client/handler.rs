@@ -8,7 +8,7 @@ use storage::file_storage::FileStorage;
 use storage::storage::Storage;
 use tokio::sync::Mutex;
 use utilities::logger::{error, instrument, trace, tracing};
-use utilities::tcp_pool::TcpPool;
+use utilities::tcp_pool::TCP_CONNECTION_POOL;
 
 use crate::datanode_state::DatanodeState;
 use crate::peer::service::PeerService;
@@ -16,7 +16,6 @@ use crate::peer::service::PeerService;
 pub struct ClientHandler {
     state: Arc<Mutex<DatanodeState>>,
     peer_service: PeerService,
-    tcp_connection_pool: TcpPool,
     store: FileStorage,
 }
 impl ClientHandler {
@@ -24,7 +23,6 @@ impl ClientHandler {
         Self {
             state,
             peer_service: PeerService {},
-            tcp_connection_pool: TcpPool::new(),
             store,
         }
     }
@@ -65,7 +63,7 @@ impl ClientDataNode for ClientHandler {
                 }
             };
             trace!(tcp_addrs = %tcp_address,"Got the pipeline address");
-            let tcp_connection = match self.tcp_connection_pool.get_connection(&tcp_address).await {
+            let tcp_connection = match TCP_CONNECTION_POOL.get_connection(&tcp_address).await {
                 Ok(connection) => connection,
                 Err(e) => {
                     return Err(tonic::Status::internal(format!(

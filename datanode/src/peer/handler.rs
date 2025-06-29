@@ -6,7 +6,10 @@ use proto::generated::datanode_datanode::{
 };
 use storage::{file_storage::FileStorage, storage::Storage};
 use tokio::{net::TcpStream, sync::Mutex};
-use utilities::logger::{error, instrument, trace, tracing};
+use utilities::{
+    logger::{error, instrument, trace, tracing},
+    result::Result,
+};
 
 use crate::{datanode_state::DatanodeState, peer::service::PeerService};
 pub struct PeerHandler {
@@ -23,7 +26,7 @@ impl PeerHandler {
             store,
         }
     }
-    async fn get_tcp_connection(&self, addrs: &str) -> Result<TcpStream, Box<dyn Error>> {
+    async fn get_tcp_connection(&self, addrs: &str) -> Result<TcpStream> {
         Ok(TcpStream::connect(addrs).await.map_err(|e| {
             format!(
                 "error while creating the tcp connection addrs : {}, error: {}",
@@ -39,7 +42,7 @@ impl Peer for PeerHandler {
     async fn create_pipeline(
         &self,
         request: tonic::Request<CreatePipelineRequest>,
-    ) -> Result<tonic::Response<CreatePipelineResponse>, tonic::Status> {
+    ) -> std::result::Result<tonic::Response<CreatePipelineResponse>, tonic::Status> {
         let create_pipeline_request = request.get_ref();
         trace!(request = ?create_pipeline_request,"Got create pipeline request");
         // first we will send the create pipeling request to the next replica
@@ -88,7 +91,7 @@ impl Peer for PeerHandler {
     async fn commit_chunk(
         &self,
         request: tonic::Request<CommitChunkRequest>,
-    ) -> Result<tonic::Response<CommitChunkResponse>, tonic::Status> {
+    ) -> std::result::Result<tonic::Response<CommitChunkResponse>, tonic::Status> {
         trace!("Got commit chunk request from peer");
         let commit_chunk_request = request.into_inner();
         let mut state = self.state.lock().await;

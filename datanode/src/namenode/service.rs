@@ -9,6 +9,7 @@ use tonic::transport::Channel;
 use utilities::{
     grpc_channel_pool::GRPC_CHANNEL_POOL,
     logger::{error, info, trace},
+    result::Result,
 };
 
 use crate::datanode_state::DatanodeState;
@@ -20,15 +21,12 @@ impl NamenodeService {
     pub fn new(state: Arc<Mutex<DatanodeState>>) -> Self {
         Self { state }
     }
-    async fn get_grpc_connection(
-        &self,
-        addrs: &str,
-    ) -> Result<DatanodeNamenodeClient<Channel>, Box<dyn Error>> {
+    async fn get_grpc_connection(&self, addrs: &str) -> Result<DatanodeNamenodeClient<Channel>> {
         let channel = GRPC_CHANNEL_POOL.get_channel(addrs).await.unwrap();
         Ok(DatanodeNamenodeClient::new(channel))
     }
 
-    pub async fn connect(&self) -> Result<bool, Box<dyn Error>> {
+    pub async fn connect(&self) -> Result<bool> {
         let state = self.state.lock().await;
         let namenode_addrs = state.namenode_addrs.clone();
         let id = state.get_id();
@@ -55,7 +53,7 @@ impl NamenodeService {
             }
         }
     }
-    pub async fn send_heart_beat(&self) -> Result<(), Box<dyn Error>> {
+    pub async fn send_heart_beat(&self) -> Result<()> {
         let state = self.state.lock().await;
         let namenode_addrs = state.namenode_addrs.clone();
         let id = state.get_id();
@@ -68,7 +66,7 @@ impl NamenodeService {
             .await?;
         Ok(())
     }
-    pub async fn state_sync(&self) -> Result<(), Box<dyn Error>> {
+    pub async fn state_sync(&self) -> Result<()> {
         let state = self.state.lock().await;
         let namenode_addrs = state.namenode_addrs.clone();
         trace!(?state, "sending state sync with");
