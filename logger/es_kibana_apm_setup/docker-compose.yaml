@@ -1,0 +1,85 @@
+
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.16.6
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=true
+      - xpack.security.transport.ssl.enabled=false
+      - ELASTIC_USERNAME=${ELASTIC_USERNAME}
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+      - xpack.security.audit.enabled= true
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -s -u ${ELASTIC_USERNAME}:${ELASTIC_PASSWORD} ${ELASTICSEARCH_HOST:-http://localhost:9200}/_cluster/health | grep -q '\"status\":\"green\"\\|\"status\":\"yellow\"'",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    ports:
+      - 9200:9200
+    networks:
+      - elastic
+  init-users:
+    image: curlimages/curl:latest
+    container_name: init-users
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    volumes:
+      - ./init.sh:/init-users.sh
+    environment:
+      - ELASTIC_USERNAME=${ELASTIC_USERNAME}
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+      - KIBANA_PASSWORD=${KIBANA_PASSWORD}
+      - APM_PASSWORD=${APM_PASSWORD}
+      - ELASTICSEARCH_HOST=${ELASTICSEARCH_HOST}
+      - ADMIN_USERNAME=${ADMIN_USERNAME}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+    entrypoint: ["sh", "/init-users.sh"]
+    networks:
+      - elastic
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.16.6
+    container_name: kibana
+    depends_on:
+      init-users:
+        condition: service_completed_successfully
+    environment:
+      - xpack.security.enabled=true
+      - ELASTICSEARCH_HOSTS=${ELASTICSEARCH_HOST}
+      - ELASTICSEARCH_USERNAME=${KIBANA_USERNAME}
+      - ELASTICSEARCH_PASSWORD=${KIBANA_PASSWORD}
+    ports:
+      - 5601:5601
+    networks:
+      - elastic
+
+  apm-server:
+    image: docker.elastic.co/apm/apm-server:8.16.6
+    container_name: apm-server
+    depends_on:
+      init-users:
+        condition: service_completed_successfully
+    volumes:
+      - ./apm_config.yml:/usr/share/apm-server/apm-server.yml:ro
+    environment:
+      - ELASTICSEARCH_HOSTS=${ELASTICSEARCH_HOST}
+      - ELASTICSEARCH_USERNAME=${ADMIN_USERNAME}
+      - ELASTICSEARCH_PASSWORD=${ADMIN_PASSWORD}
+    ports:
+      - 8200:8200
+      - 4313:4313
+    networks:
+      - elastic
+
+networks:
+  elastic:
+    driver: bridge
+

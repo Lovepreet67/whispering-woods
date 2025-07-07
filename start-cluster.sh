@@ -5,6 +5,7 @@ set -e
 # this scrip assumes that you have gfs-namenode and gfs-datanode present in docker and ek (elastic search and kibana are running) 
 # Set ENV variable globally
 export ENV="Cluster"
+export APM_ENDPOINT="http://host.docker.internal:8200/v1/traces"
 
 # Here we are mapping host.docker.internal to resolve to local host on local machine 
 # so that we can use same address inside container and host machine
@@ -20,6 +21,7 @@ docker run -d \
   -e INTERNAL_GRPC_PORT=7000 \
   -e NODE_ID=namenode_0 \
   -e RUST_LOG=namenode=trace \
+  -e APM_ENDPOINT=$APM_ENDPOINT \
   --name gfs-namenode \
   gfs-namenode
 echo "Namenode running"
@@ -49,7 +51,8 @@ for ((i = 1; i <= DATANODE_COUNT; i++)); do
     -e INTERNAL_TCP_PORT=3001 \
     -e EXTERNAL_TCP_ADDRS=host.docker.internal:${tcp_port} \
     -e NAMENODE_ADDRS=http://host.docker.internal:7000 \
-    -e RUST_LOG=datanode=trace \
+    -e RUST_LOG=datanode=trace,utilities=trace,storage=trace  \
+    -e APM_ENDPOINT=$APM_ENDPOINT \
     gfs-datanode
 done
 
@@ -57,4 +60,4 @@ done
 echo "Cluster started with $DATANODE_COUNT datanodes."
 echo "Starting a client"
 export NAMENODE_ADDRS="http://host.docker.internal:7000"
-RUST_LOG=client=trace cargo run -p client
+RUST_LOG=client=trace,utilities=trace  APM_ENDPOINT=$APM_ENDPOINT cargo run -p client

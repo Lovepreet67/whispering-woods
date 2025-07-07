@@ -8,6 +8,6 @@ filebeat.inputs:
 output.elasticsearch:
   hosts: ["${ES_HOST:http://host.docker.internal:9200}"]
   username: "elastic"
-  password: ""  # Leave blank if xpack security is disabled
+  password: "password"  # Leave blank if xpack security is disabled
 
 setup.ilm.enabled: false
