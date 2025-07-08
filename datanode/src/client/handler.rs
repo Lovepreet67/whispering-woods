@@ -39,7 +39,7 @@ impl ClientDataNode for ClientHandler {
         };
         Ok(tonic::Response::new(response))
     }
-    #[instrument(skip(self,request),fields(chunk_id =  %request.get_ref().chunk_id))]
+    #[instrument(name="grpc_client_store_chunk_handler",skip(self,request),fields(chunk_id =  %request.get_ref().chunk_id))]
     async fn store_chunk(
         &self,
         request: tonic::Request<StoreChunkRequest>,
@@ -90,7 +90,7 @@ impl ClientDataNode for ClientHandler {
         };
         Ok(tonic::Response::new(response))
     }
-    #[instrument(skip(self,request),fields(chunk_id =  %request.get_ref().chunk_id))]
+    #[instrument(name="grpc_client_commit_chunk_handler",skip(self,request),fields(chunk_id =  %request.get_ref().chunk_id))]
     async fn commit_chunk(
         &self,
         request: tonic::Request<CommitChunkRequest>,
@@ -138,7 +138,7 @@ impl ClientDataNode for ClientHandler {
         let commit_chunk_response = CommitChunkResponse { committed };
         Ok(tonic::Response::new(commit_chunk_response))
     }
-    #[instrument(skip(self,request),fields(chunk_id = %request.get_ref().chunk_id))]
+    #[instrument(name="grpc_client_fetch_chunk_handler",skip(self,request),fields(chunk_id = %request.get_ref().chunk_id))]
     async fn fetch_chunk(
         &self,
         request: tonic::Request<FetchChunkRequest>,

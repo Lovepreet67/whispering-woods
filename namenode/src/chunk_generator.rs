@@ -1,5 +1,7 @@
 use std::cmp::min;
 
+use utilities::logger::{instrument,tracing};
+
 use crate::data_structure::ChunkBounderies;
 
 pub trait ChunkGenerator {
@@ -17,6 +19,7 @@ impl DefaultChunkGenerator {
 }
 
 impl ChunkGenerator for DefaultChunkGenerator {
+    #[instrument(name="namenode_get_chunks",skip(self))]
     fn get_chunks(&self, file_size: u64, _file_name: &str) -> Vec<ChunkBounderies> {
         let mut curr_offset: u64 = 0;
         let mut chunks: Vec<ChunkBounderies> = vec![];

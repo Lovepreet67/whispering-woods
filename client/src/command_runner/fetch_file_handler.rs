@@ -1,5 +1,5 @@
 use utilities::{
-    logger::{error, info, instrument, trace, tracing},
+    logger::{error, info, instrument, trace, tracing, Instrument},
     result::Result,
     retry_policy::retry_with_backoff,
 };
@@ -36,7 +36,6 @@ impl FetchFileHandler {
             let chunk_joiner = chunk_joiner.clone();
             let datanode = self.datanode.clone();
             let chunk_detail = chunk_detail.clone();
-
             handles.push(tokio::spawn(async move {
                 retry_with_backoff(
                     || async {
@@ -62,7 +61,7 @@ impl FetchFileHandler {
                     3,
                 )
                 .await
-            }));
+            }.in_current_span()));
         }
 
         for handle in handles {

@@ -21,7 +21,7 @@ impl PeerService {
         let channel = GRPC_CHANNEL_POOL.get_channel(addrs).await?;
         Ok(PeerClient::new(channel))
     }
-    #[instrument(skip(self))]
+    #[instrument(name="service_peer_create_pipeline",skip(self))]
     pub async fn create_pipeline(
         &self,
         chunk_id: &str,
@@ -54,6 +54,7 @@ impl PeerService {
         let create_pipelince_response = response.get_ref();
         Ok(create_pipelince_response.address.to_owned())
     }
+    #[instrument(name="service_peer_commit_chunk",skip(self))]
     pub async fn commit_chunk(&self, chunk_id: &str, addrs: &str) -> Result<bool> {
         let response = retry_with_backoff(
             || async {

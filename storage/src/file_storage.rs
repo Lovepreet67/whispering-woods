@@ -2,7 +2,7 @@ use std::{
     error::Error,
     path::{Path, PathBuf},
 };
-use tracing::{error, info};
+use tracing::{error, info, instrument};
 
 use crate::storage::Storage;
 use tokio::{
@@ -45,6 +45,7 @@ impl FileStorage {
     }
 }
 impl Storage for FileStorage {
+    #[instrument(name="file_storage_write",skip(self,chunk_stream))]
     async fn write(
         &self,
         chunk_id: String,
@@ -55,6 +56,7 @@ impl Storage for FileStorage {
         let writer_byte_count = copy(chunk_stream, &mut chunk_file).await?;
         Ok(writer_byte_count)
     }
+    #[instrument(name="file_storage_commit",skip(self))]
     async fn commit(&self, chunk_id: String) -> Result<bool, Box<dyn Error>> {
         // check if file is in staged area
         let staged_path = self.get_staged_path(&chunk_id);
@@ -68,6 +70,7 @@ impl Storage for FileStorage {
         }
         Ok(true)
     }
+    #[instrument(name="file_storage_read",skip(self))]
     async fn read(
         &self,
         chunk_id: String,
@@ -89,6 +92,7 @@ impl Storage for FileStorage {
         }
         Ok(exists)
     }
+    #[instrument(name="file_storage_available_chunk",skip(self))]
     async fn available_chunks(&self) -> Result<Vec<String>, Box<dyn Error>> {
         info!(root=%self.root,"Reading the dir to get available chunks");
         let mut dir_enteries = fs::read_dir(&self.root).await?;

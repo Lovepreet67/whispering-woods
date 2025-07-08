@@ -1,17 +1,17 @@
 use crate::result::Result;
 use std::time::Duration;
 use tokio::time::sleep;
-use tracing::{error, info};
+use tracing::{error, info, info_span,instrument, Instrument};
 
 pub async fn retry_with_backoff<F, Fut, R>(mut f: F, max_retries: u8) -> Result<R>
 where
-    F: FnMut() -> Fut,
+    F: FnMut() -> Fut + Instrument,
     Fut: Future<Output = Result<R>>,
     R: Send + Sync,
 {
     let mut curr_try = 1;
     loop {
-        match f().await {
+        match f().instrument(info_span!("with_retry", %curr_try)) .await {
             Ok(v) => {
                 return Ok(v);
             }

@@ -1,6 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use tokio::{sync::Mutex, time::interval};
+use utilities::logger::{span, Level};
 
 use crate::namenode_state::NamenodeState;
 
@@ -18,6 +19,9 @@ impl StateMantainer {
             let mut ticker = interval(Duration::from_secs(5));
             loop {
                 ticker.tick().await;
+                let span = span!(Level::INFO, "namenode_state_sync");
+                let _entered = span.enter();
+
                 let mut state = self.namenode_state.lock().await;
                 // do the state mantaining task
                 let heartbeat_details = state.datanode_to_heart_beat_time.clone();

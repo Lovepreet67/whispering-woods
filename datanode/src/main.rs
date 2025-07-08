@@ -20,7 +20,7 @@ use storage::file_storage;
 use tokio::sync::Mutex;
 use tokio::time::sleep;
 use tonic::transport::Server;
-use utilities::logger::{Instrument, Level, error, info, init_logger, span, trace};
+use utilities::{logger::{error, info, init_logger, span, trace, Instrument, Level}, tcp_pool};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -81,8 +81,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
         state.clone(),
     )
     .await?;
+    let tcp_span = root_span.clone();
     tokio::spawn(
         async move {
+            let _gaurd = tcp_span.enter();
             match tcp_handler.start_and_accept().await {
                 Ok(_) => {}
                 Err(e) => {
@@ -100,8 +102,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // heartbeat sending logic
     let namenode_service = NamenodeService::new(state.clone());
+    let namenode_service_span = root_span.clone();
     tokio::spawn(
         async move {
+            let _gaurd = namenode_service_span.enter();
             match namenode_service.connect().await {
                 Ok(v) => {
                     if v {

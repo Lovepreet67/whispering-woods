@@ -2,7 +2,7 @@ use std::{sync::Arc, time::Duration};
 
 use storage::{file_storage::FileStorage, storage::Storage};
 use tokio::{sync::Mutex, time::interval};
-use utilities::logger::{error, instrument, tracing};
+use utilities::logger::{Level, error, span};
 
 use crate::datanode_state::DatanodeState;
 
@@ -14,12 +14,13 @@ impl StateMantainer {
     pub fn new(store: FileStorage, state: Arc<Mutex<DatanodeState>>) -> Self {
         Self { store, state }
     }
-    #[instrument(skip(self, duration))]
     pub fn start_sync_loop(self, duration: Duration) {
         tokio::spawn(async move {
             let mut ticker = interval(duration);
             loop {
                 ticker.tick().await;
+                let span = span!(Level::INFO, "datanode_state_sync");
+                let _entered = span.enter();
                 let available_chunks = match self.store.available_chunks().await {
                     Ok(v) => v,
                     Err(e) => {

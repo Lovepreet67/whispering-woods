@@ -16,7 +16,7 @@ impl NamenodeHandler {
 
 #[tonic::async_trait]
 impl NamenodeDatanode for NamenodeHandler {
-    #[instrument(skip(self,request), fields(chunk_id = %request.get_ref().id))]
+    #[instrument(name="grpc_namenode_delete_chunk_handler",skip(self,request), fields(chunk_id = %request.get_ref().id))]
     async fn delete_chunk(
         &self,
         request: tonic::Request<DeleteChunkRequest>,

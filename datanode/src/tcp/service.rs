@@ -6,7 +6,7 @@ use tokio::{
     net::{TcpListener, TcpStream},
     sync::Mutex,
 };
-use utilities::logger::{Instrument, Span, error, instrument, trace, tracing};
+use utilities::logger::{error, span, trace, Instrument, Level, Span};
 
 use crate::{datanode_state::DatanodeState, tcp::stream_tee};
 
@@ -45,7 +45,6 @@ impl TCPService {
             );
         }
     }
-    #[instrument(skip(tcp_stream, store, state))]
     async fn handle_connection(
         mut tcp_stream: TcpStream,
         store: FileStorage,
@@ -64,6 +63,8 @@ impl TCPService {
             .read_exact(std::slice::from_mut(&mut mode))
             .await?;
         if mode == 1 {
+        let span = span!(Level::INFO,"service_tcp_write_chunk",%chunk_id);
+        let _gaurd = span.enter();
             trace!(%chunk_id,"Mode set to write");
             // read a file from the
             // after reading the chunk_id and mode  we will post that details to the pipeline
@@ -83,7 +84,7 @@ impl TCPService {
                             error!("Error while sending data to pipeline {e}");
                         }
                     }
-                });
+                }.in_current_span());
                 tokio::spawn(async move {
                     match store.write(chunk_id.clone(), &mut stream2).await {
                         Ok(_) => {}
@@ -91,11 +92,13 @@ impl TCPService {
                             error!("Error while writing data to store {e}");
                         }
                     }
-                });
+                }.in_current_span());
             } else {
                 store.write(chunk_id, &mut tcp_stream).await?;
             }
         } else if mode == 2 {
+            let span = span!(Level::INFO,"service_tcp_read_chunk",%chunk_id);
+            let _gaurd = span.enter();
             trace!(%chunk_id,"Mode set to read");
 
             //if file is already present just delete it (for future)

@@ -1,4 +1,4 @@
-use std::{error::Error, sync::Arc};
+use std::{sync::Arc};
 
 use proto::generated::datanode_datanode::{
     CommitChunkRequest, CommitChunkResponse, CreatePipelineRequest, CreatePipelineResponse,
@@ -38,7 +38,7 @@ impl PeerHandler {
 
 #[tonic::async_trait]
 impl Peer for PeerHandler {
-    #[instrument(skip(self,request), fields(chunk_id = %request.get_ref().chunk_id))]
+    #[instrument(name="grpc_peer_create_pipeline",skip(self,request), fields(chunk_id = %request.get_ref().chunk_id))]
     async fn create_pipeline(
         &self,
         request: tonic::Request<CreatePipelineRequest>,
@@ -87,7 +87,7 @@ impl Peer for PeerHandler {
         };
         Ok(tonic::Response::new(response))
     }
-    #[instrument(skip(self,request), fields(chunk_id = %request.get_ref().chunk_id))]
+    #[instrument(name="grpc_peer_commit_chunk",skip(self,request), fields(chunk_id = %request.get_ref().chunk_id))]
     async fn commit_chunk(
         &self,
         request: tonic::Request<CommitChunkRequest>,

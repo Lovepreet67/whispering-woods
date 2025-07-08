@@ -1,6 +1,7 @@
 use std::{sync::Arc, time::Instant};
 
 use tokio::sync::Mutex;
+use utilities::logger::{instrument,tracing};
 
 use crate::namenode_state;
 use crate::namenode_state::NamenodeState;
@@ -23,6 +24,7 @@ impl DatanodeHandler {
 
 #[tonic::async_trait]
 impl DatanodeNamenode for DatanodeHandler {
+    #[instrument(name="grpc_datanode_heart_beat",skip(self,request),fields(datanode_id= %request.get_ref().datanode_id))]
     async fn heart_beat(
         &self,
         request: tonic::Request<HeartBeatRequest>,
@@ -47,6 +49,7 @@ impl DatanodeNamenode for DatanodeHandler {
         };
         Ok(tonic::Response::new(response))
     }
+    #[instrument(name="grpc_datanode_connection",skip(self,request),fields(datanode_id= %request.get_ref().id))]
     async fn connection(
         &self,
         request: tonic::Request<ConnectionRequest>,
@@ -83,6 +86,7 @@ impl DatanodeNamenode for DatanodeHandler {
         drop(state);
         Ok(tonic::Response::new(response))
     }
+    #[instrument(name="grpc_datanode_state_sync",skip(self,request),fields(datanode_id= %request.get_ref().id))]
     async fn state_sync(
         &self,
         request: tonic::Request<StateSyncRequest>,

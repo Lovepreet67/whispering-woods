@@ -6,7 +6,7 @@ use crate::{datanode_service::DatanodeService, namenode_service::NamenodeService
 use delete_file_handler::DeleteFileHandler;
 use fetch_file_handler::FetchFileHandler;
 use store_file_handler::StoreFileHandler;
-use utilities::result::Result;
+use utilities::{logger::instrument, logger::tracing, result::Result};
 
 pub struct CommandRunner {
     store_file_handler: StoreFileHandler,
@@ -21,6 +21,7 @@ impl CommandRunner {
             delete_file_handler: DeleteFileHandler::new(namenode),
         }
     }
+    #[instrument(skip(self))]
     pub async fn handle_input(&mut self, command: &mut str) -> Result<String> {
         match command {
             fetch_command if fetch_command.starts_with("fetch") => {

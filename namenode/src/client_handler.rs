@@ -6,7 +6,7 @@ use proto::generated::client_namenode::{
 };
 use tokio::sync::Mutex;
 use tonic::Code;
-use utilities::logger::{Level, debug, span, trace};
+use utilities::logger::{debug, instrument, span, trace, Level};
 
 use crate::{
     chunk_generator::{ChunkGenerator, DefaultChunkGenerator},
@@ -50,7 +50,7 @@ impl ClientNameNode for ClientHandler {
         request: tonic::Request<StoreFileRequest>,
     ) -> Result<tonic::Response<StoreFileResponse>, tonic::Status> {
         let store_file_request = request.get_ref();
-        let fn_span = span!(Level::INFO,"store_file",file_name = %store_file_request.file_name,file_size=%store_file_request.file_size);
+        let fn_span = span!(Level::INFO,"grpc_client_store_file",file_name = %store_file_request.file_name,file_size=%store_file_request.file_size);
         let _entered = fn_span.enter();
         let chunk_bounderies = self
             .chunk_generator
@@ -111,7 +111,7 @@ impl ClientNameNode for ClientHandler {
         request: tonic::Request<FetchFileRequest>,
     ) -> Result<tonic::Response<FetchFileResponse>, tonic::Status> {
         let fetch_file_request = request.get_ref();
-        let fn_span = span!(Level::INFO,"fetch_file",file_name = %fetch_file_request.file_name);
+        let fn_span = span!(Level::INFO,"grpc_client_fetch_file",file_name = %fetch_file_request.file_name);
         let _entered = fn_span.enter();
         //TODO: find something better than cloning state
         //if we don't clone here this becomes deadlock when we can function get_datanodes_to_serve
@@ -159,7 +159,7 @@ impl ClientNameNode for ClientHandler {
         let delete_file_request = request.get_ref();
         let fn_span = span!(
             Level::INFO,
-            "delete_file",
+            "grpc_client_delete_file",
             file_name = delete_file_request.file_name
         );
         let _enter = fn_span.enter();

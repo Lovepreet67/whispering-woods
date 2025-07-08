@@ -1,6 +1,6 @@
 use proto::generated::client_namenode::ChunkMeta;
 use tokio::io::{AsyncSeekExt, AsyncWriteExt, copy};
-use utilities::{logger::trace, result::Result};
+use utilities::{logger::{instrument,tracing, trace}, result::Result};
 
 #[derive(Clone)]
 pub struct ChunkJoiner {
@@ -8,6 +8,7 @@ pub struct ChunkJoiner {
 }
 
 impl ChunkJoiner {
+    #[instrument(name="new_chunk_joiner")]
     pub async fn new(file_path: String, file_size: u64) -> Result<Self> {
         trace!("Creating file");
         // we are resorving space for file we are going to store
@@ -25,6 +26,7 @@ impl ChunkJoiner {
             .map_err(|e| format!("Error while writing to file intitaly {e:?}"))?;
         Ok(Self { file_path })
     }
+    #[instrument(skip(self,reader))]
     pub async fn join_chunk(
         &self,
         chunk_details: &ChunkMeta,
@@ -44,6 +46,7 @@ impl ChunkJoiner {
             .map_err(|e| format!("Error while copying chunk from reader to file {e:?}"))?;
         Ok(())
     }
+    #[instrument(name="abort_join_chunk",skip(self))]
     pub async fn abort(&self) {
         tokio::fs::remove_file(&self.file_path).await;
     }

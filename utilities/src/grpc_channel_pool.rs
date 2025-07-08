@@ -4,7 +4,7 @@ use crate::result::Result;
 use crate::retry_policy::retry_with_backoff;
 use tokio::sync::Mutex;
 use tonic::transport::{Channel, Endpoint};
-use tracing::{Instrument, Span, trace};
+use tracing::{instrument, trace, Instrument, Span};
 
 #[derive(Clone, Debug)]
 pub struct GrpcChannelPool {
@@ -16,6 +16,7 @@ impl GrpcChannelPool {
             store: Arc::default(),
         }
     }
+    #[instrument(name="grpc_pool_get_channel",skip(self))]
     pub async fn get_channel(&self, addrs: &str) -> Result<Channel> {
         if let Some(chnl) = self.store.lock().await.get(addrs) {
             trace!("Channel already present");

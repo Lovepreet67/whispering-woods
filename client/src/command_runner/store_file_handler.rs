@@ -1,5 +1,5 @@
 use utilities::{
-    logger::{error, info, instrument, trace, tracing},
+    logger::{error, info, instrument, trace, tracing, Instrument},
     result::Result,
     retry_policy::retry_with_backoff,
 };
@@ -71,7 +71,7 @@ impl StoreFileHandler {
                     3,
                 )
                 .await
-            }));
+            }.in_current_span()));
         }
 
         for handle in handles {
