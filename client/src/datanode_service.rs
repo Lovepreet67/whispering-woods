@@ -24,7 +24,7 @@ impl DatanodeService {
         let channel = GRPC_CHANNEL_POOL.get_channel(addrs).await.unwrap();
         Ok(ClientDataNodeClient::new(channel))
     }
-    #[instrument(name="datanode_service_store_chunk",skip(self, read_stream))]
+    #[instrument(name = "datanode_service_store_chunk", skip(self, read_stream))]
     pub async fn store_chunk(
         &self,
         chunk_id: String,
@@ -62,7 +62,7 @@ impl DatanodeService {
         trace!("committed successfully");
         Ok(())
     }
-    #[instrument(name="datanode_service_fetch_chunk",skip(self))]
+    #[instrument(name = "datanode_service_fetch_chunk", skip(self))]
     pub async fn fetch_chunk(
         &self,
         chunk_id: String,

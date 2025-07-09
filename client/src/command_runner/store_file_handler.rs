@@ -1,5 +1,5 @@
 use utilities::{
-    logger::{error, info, instrument, trace, tracing, Instrument},
+    logger::{Instrument, error, info, instrument, trace, tracing},
     result::Result,
     retry_policy::retry_with_backoff,
 };
@@ -48,30 +48,33 @@ impl StoreFileHandler {
             let file_chunk = file_chunker.next_chunk().unwrap();
             let chunk_detail = chunk_detail.clone();
 
-            handles.push(tokio::spawn(async move {
-                retry_with_backoff(
-                    || async {
-                        trace!(id = %chunk_detail.id,"working on chunk");
-                        let read_stream = file_chunk.get_read_stream().await?;
-                        let res = datanode
-                            .store_chunk(
-                                chunk_detail.id.clone(),
-                                chunk_detail.location.clone(),
-                                read_stream,
-                            )
-                            .await;
-                        match res {
-                            Ok(_) => Ok(()),
-                            Err(e) => {
-                                error!("{}", e);
-                                Err(e)
+            handles.push(tokio::spawn(
+                async move {
+                    retry_with_backoff(
+                        || async {
+                            trace!(id = %chunk_detail.id,"working on chunk");
+                            let read_stream = file_chunk.get_read_stream().await?;
+                            let res = datanode
+                                .store_chunk(
+                                    chunk_detail.id.clone(),
+                                    chunk_detail.location.clone(),
+                                    read_stream,
+                                )
+                                .await;
+                            match res {
+                                Ok(_) => Ok(()),
+                                Err(e) => {
+                                    error!("{}", e);
+                                    Err(e)
+                                }
                             }
-                        }
-                    },
-                    3,
-                )
-                .await
-            }.in_current_span()));
+                        },
+                        3,
+                    )
+                    .await
+                }
+                .in_current_span(),
+            ));
         }
 
         for handle in handles {

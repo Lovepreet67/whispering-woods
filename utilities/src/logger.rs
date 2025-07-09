@@ -1,6 +1,6 @@
 use opentelemetry::{KeyValue, runtime::Tokio};
 use opentelemetry_otlp::{WithExportConfig, new_exporter, new_pipeline};
-use opentelemetry_sdk::{trace::Tracer, Resource};
+use opentelemetry_sdk::{Resource, trace::Tracer};
 use tracing::level_filters::LevelFilter;
 use tracing_appender::{
     non_blocking::WorkerGuard,
@@ -8,7 +8,7 @@ use tracing_appender::{
 };
 use tracing_subscriber::{
     EnvFilter,
-    fmt,
+    fmt::{self, format::FmtSpan},
     layer::SubscriberExt,
     util::SubscriberInitExt,
 };
@@ -54,7 +54,7 @@ pub fn init_logger(service_name: &str, node_id: &str) -> WorkerGuard {
         .with_thread_names(true)
         .with_current_span(true)
         .with_target(true)
-        //.with_span_events(FmtSpan::ENTER | FmtSpan::EXIT)
+        .with_span_events(FmtSpan::ENTER | FmtSpan::EXIT)
         .flatten_event(true);
     let stdout_layer = fmt::layer().with_writer(std::io::stdout);
     let filter = EnvFilter::builder()

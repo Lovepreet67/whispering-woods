@@ -1,4 +1,4 @@
-use std::{sync::Arc};
+use std::sync::Arc;
 
 use proto::generated::datanode_datanode::{
     CommitChunkRequest, CommitChunkResponse, CreatePipelineRequest, CreatePipelineResponse,

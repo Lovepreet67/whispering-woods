@@ -1,7 +1,7 @@
 use std::{sync::Arc, time::Instant};
 
 use tokio::sync::Mutex;
-use utilities::logger::{instrument,tracing};
+use utilities::logger::{instrument, tracing};
 
 use crate::namenode_state;
 use crate::namenode_state::NamenodeState;

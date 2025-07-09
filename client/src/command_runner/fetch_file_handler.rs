@@ -1,5 +1,5 @@
 use utilities::{
-    logger::{error, info, instrument, trace, tracing, Instrument},
+    logger::{Instrument, error, info, instrument, trace, tracing},
     result::Result,
     retry_policy::retry_with_backoff,
 };
@@ -36,32 +36,35 @@ impl FetchFileHandler {
             let chunk_joiner = chunk_joiner.clone();
             let datanode = self.datanode.clone();
             let chunk_detail = chunk_detail.clone();
-            handles.push(tokio::spawn(async move {
-                retry_with_backoff(
-                    || async {
-                        let fetch_chunk_result = datanode
-                            .fetch_chunk(
-                                chunk_detail.id.clone(),
-                                chunk_detail.location[0].addrs.clone(),
-                            )
-                            .await;
-                        match fetch_chunk_result {
-                            Ok(mut read_stream) => {
-                                let _ = chunk_joiner
-                                    .join_chunk(&chunk_detail, &mut read_stream)
-                                    .await;
+            handles.push(tokio::spawn(
+                async move {
+                    retry_with_backoff(
+                        || async {
+                            let fetch_chunk_result = datanode
+                                .fetch_chunk(
+                                    chunk_detail.id.clone(),
+                                    chunk_detail.location[0].addrs.clone(),
+                                )
+                                .await;
+                            match fetch_chunk_result {
+                                Ok(mut read_stream) => {
+                                    let _ = chunk_joiner
+                                        .join_chunk(&chunk_detail, &mut read_stream)
+                                        .await;
+                                }
+                                Err(e) => {
+                                    error!(error = %e,"Error during chunk fetching");
+                                    return Err(e);
+                                }
                             }
-                            Err(e) => {
-                                error!(error = %e,"Error during chunk fetching");
-                                return Err(e);
-                            }
-                        }
-                        Ok(())
-                    },
-                    3,
-                )
-                .await
-            }.in_current_span()));
+                            Ok(())
+                        },
+                        3,
+                    )
+                    .await
+                }
+                .in_current_span(),
+            ));
         }
 
         for handle in handles {

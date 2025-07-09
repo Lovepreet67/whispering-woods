@@ -3,7 +3,7 @@ use tokio::{
     fs::OpenOptions,
     io::{AsyncRead, AsyncReadExt, AsyncSeekExt},
 };
-use utilities::{logger::instrument,logger::tracing, result::Result};
+use utilities::{logger::instrument, logger::tracing, result::Result};
 
 #[derive(Clone)]
 pub struct FileChunk {
@@ -39,7 +39,7 @@ impl<'a> FileChunker<'a> {
             current_index: 0,
         }
     }
-    #[instrument(name="file_chunker_next_chunk",skip(self))]
+    #[instrument(name = "file_chunker_next_chunk", skip(self))]
     pub fn next_chunk(&mut self) -> Option<FileChunk> {
         if self.current_index >= self.chunk_details.len() {
             return None;

@@ -8,7 +8,7 @@ use tokio::sync::Mutex;
 use tonic::transport::Channel;
 use utilities::{
     grpc_channel_pool::GRPC_CHANNEL_POOL,
-    logger::{error, info, instrument, trace,tracing},
+    logger::{error, info, instrument, trace, tracing},
     result::Result,
 };
 
@@ -25,7 +25,7 @@ impl NamenodeService {
         let channel = GRPC_CHANNEL_POOL.get_channel(addrs).await.unwrap();
         Ok(DatanodeNamenodeClient::new(channel))
     }
-    #[instrument(name="service_namenode_connect",skip(self))]
+    #[instrument(name = "service_namenode_connect", skip(self))]
     pub async fn connect(&self) -> Result<bool> {
         let state = self.state.lock().await;
         let namenode_addrs = state.namenode_addrs.clone();
@@ -53,7 +53,7 @@ impl NamenodeService {
             }
         }
     }
-    #[instrument(name="service_namenode_send_heart_beat",skip(self))]
+    #[instrument(name = "service_namenode_send_heart_beat", skip(self))]
     pub async fn send_heart_beat(&self) -> Result<()> {
         let state = self.state.lock().await;
         let namenode_addrs = state.namenode_addrs.clone();
@@ -67,7 +67,7 @@ impl NamenodeService {
             .await?;
         Ok(())
     }
-    #[instrument(name="service_namenode_state_sync",skip(self))]
+    #[instrument(name = "service_namenode_state_sync", skip(self))]
     pub async fn state_sync(&self) -> Result<()> {
         let state = self.state.lock().await;
         let namenode_addrs = state.namenode_addrs.clone();

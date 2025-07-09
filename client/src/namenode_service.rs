@@ -17,7 +17,7 @@ impl NamenodeService {
     pub fn new(connection: ClientNameNodeClient<Channel>) -> Self {
         Self { connection }
     }
-    #[instrument(name="namenode_store_file",skip(self))]
+    #[instrument(name = "namenode_store_file", skip(self))]
     pub async fn store_file(
         &mut self,
         file_name: String,
@@ -41,7 +41,7 @@ impl NamenodeService {
             .into_inner();
         Ok(store_file_response.chunk_list.clone())
     }
-    #[instrument(name="namenode_fetch_file",skip(self))]
+    #[instrument(name = "namenode_fetch_file", skip(self))]
     pub async fn fetch_file(&mut self, file_name: String) -> Result<FetchFileResponse> {
         let fetch_file_request = FetchFileRequest {
             file_name: file_name.clone(),
@@ -60,7 +60,7 @@ impl NamenodeService {
             .into_inner();
         Ok(fetch_file_response)
     }
-    #[instrument(name="namenode_delete_file",skip(self))]
+    #[instrument(name = "namenode_delete_file", skip(self))]
     pub async fn delete_file(&mut self, file_name: String) -> Result<bool> {
         debug!("delete file for #{}#", file_name);
         let delete_file_request = DeleteFileRequest {

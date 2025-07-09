@@ -21,7 +21,6 @@ impl CommandRunner {
             delete_file_handler: DeleteFileHandler::new(namenode),
         }
     }
-    #[instrument(skip(self))]
     pub async fn handle_input(&mut self, command: &mut str) -> Result<String> {
         match command {
             fetch_command if fetch_command.starts_with("fetch") => {

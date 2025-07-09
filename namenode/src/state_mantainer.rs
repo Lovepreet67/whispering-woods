@@ -1,7 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use tokio::{sync::Mutex, time::interval};
-use utilities::logger::{span, Level};
+use utilities::logger::{Level, span};
 
 use crate::namenode_state::NamenodeState;
 

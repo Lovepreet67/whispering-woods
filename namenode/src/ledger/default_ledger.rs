@@ -9,7 +9,7 @@ use tokio::{
     sync::mpsc::{self, Sender},
 };
 use tonic::async_trait;
-use utilities::logger::{debug, error, instrument,tracing};
+use utilities::logger::{debug, error, instrument, tracing};
 
 use crate::{data_structure::ChunkBounderies, namenode_state::NamenodeState};
 
@@ -90,7 +90,7 @@ impl Recorder for DefaultLedger {
 }
 
 impl Replayer for DefaultLedger {
-    #[instrument(name="namenode_log_backup_replay",skip(self))]
+    #[instrument(name = "namenode_log_backup_replay", skip(self))]
     fn replay(&self) -> Result<crate::namenode_state::NamenodeState, Box<dyn std::error::Error>> {
         debug!(filepath = %self.log_store,"file path");
         let log_file = std::fs::OpenOptions::new()

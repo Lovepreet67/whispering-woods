@@ -4,7 +4,7 @@ use command_runner::CommandRunner;
 use proto::generated::client_namenode::client_name_node_client::ClientNameNodeClient;
 use utilities::{
     grpc_channel_pool::GRPC_CHANNEL_POOL,
-    logger::{self, Level, error, info, span},
+    logger::{self, error, info},
 };
 mod chunk_joiner;
 mod command_runner;
@@ -15,8 +15,8 @@ mod namenode_service;
 async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     let client_id = std::env::var("CLIENT_NAME").unwrap_or("Client_0".to_owned());
     let _gaurd = logger::init_logger("Client", &client_id);
-    let root_span = span!(Level::INFO, "root", service = "Client",%client_id);
-    let _entered = root_span.enter();
+    //let root_span = span!(Level::INFO, "root", service = "Client",%client_id);
+    //let _entered = root_span.enter();
     let namenode_addrs = match std::env::var("NAMENODE_ADDRS") {
         Ok(v) => v,
         Err(e) => {

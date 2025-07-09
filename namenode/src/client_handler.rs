@@ -6,7 +6,7 @@ use proto::generated::client_namenode::{
 };
 use tokio::sync::Mutex;
 use tonic::Code;
-use utilities::logger::{debug, instrument, span, trace, Level};
+use utilities::logger::{Level, debug, instrument, span, trace, tracing};
 
 use crate::{
     chunk_generator::{ChunkGenerator, DefaultChunkGenerator},
@@ -45,13 +45,12 @@ impl ClientHandler {
 }
 #[tonic::async_trait]
 impl ClientNameNode for ClientHandler {
+    #[instrument(name="grpc_client_store_file",skip(self,request),fields(file_name= %request.get_ref().file_name,file_size= %request.get_ref().file_size))]
     async fn store_file(
         &self,
         request: tonic::Request<StoreFileRequest>,
     ) -> Result<tonic::Response<StoreFileResponse>, tonic::Status> {
         let store_file_request = request.get_ref();
-        let fn_span = span!(Level::INFO,"grpc_client_store_file",file_name = %store_file_request.file_name,file_size=%store_file_request.file_size);
-        let _entered = fn_span.enter();
         let chunk_bounderies = self
             .chunk_generator
             .get_chunks(store_file_request.file_size, &store_file_request.file_name);
@@ -106,13 +105,12 @@ impl ClientNameNode for ClientHandler {
         };
         Ok(tonic::Response::new(store_file_response))
     }
+    #[instrument(name="grpc_client_fetch_file",skip(self,request),fields(file_name= %request.get_ref().file_name))]
     async fn fetch_file(
         &self,
         request: tonic::Request<FetchFileRequest>,
     ) -> Result<tonic::Response<FetchFileResponse>, tonic::Status> {
         let fetch_file_request = request.get_ref();
-        let fn_span = span!(Level::INFO,"grpc_client_fetch_file",file_name = %fetch_file_request.file_name);
-        let _entered = fn_span.enter();
         //TODO: find something better than cloning state
         //if we don't clone here this becomes deadlock when we can function get_datanodes_to_serve
         //which also uses state may be reader writer locak will help
@@ -152,17 +150,12 @@ impl ClientNameNode for ClientHandler {
             fetch_file_request.file_name
         )))
     }
+    #[instrument(name="grpc_client_delete_file",skip(self,request),fields(file_name= %request.get_ref().file_name))]
     async fn delete_file(
         &self,
         request: tonic::Request<DeleteFileRequest>,
     ) -> Result<tonic::Response<DeleteFileResponse>, tonic::Status> {
         let delete_file_request = request.get_ref();
-        let fn_span = span!(
-            Level::INFO,
-            "grpc_client_delete_file",
-            file_name = delete_file_request.file_name
-        );
-        let _enter = fn_span.enter();
         self.ledger
             .delete_file(&delete_file_request.file_name)
             .await;

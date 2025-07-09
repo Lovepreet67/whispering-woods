@@ -6,7 +6,7 @@ use tokio::{
     net::{TcpListener, TcpStream},
     sync::Mutex,
 };
-use utilities::logger::{error, span, trace, Instrument, Level, Span};
+use utilities::logger::{Instrument, Level, Span, error, span, trace};
 
 use crate::{datanode_state::DatanodeState, tcp::stream_tee};
 
@@ -63,8 +63,8 @@ impl TCPService {
             .read_exact(std::slice::from_mut(&mut mode))
             .await?;
         if mode == 1 {
-        let span = span!(Level::INFO,"service_tcp_write_chunk",%chunk_id);
-        let _gaurd = span.enter();
+            let span = span!(Level::INFO,"service_tcp_write_chunk",%chunk_id);
+            let _gaurd = span.enter();
             trace!(%chunk_id,"Mode set to write");
             // read a file from the
             // after reading the chunk_id and mode  we will post that details to the pipeline
@@ -77,22 +77,28 @@ impl TCPService {
                 // faced issue when not running below task parrally because if we do one by one
                 // after first finish tx1 and tx2 both will be dropped which will hang state when
                 // fetching data from other stream. :)
-                tokio::spawn(async move {
-                    match copy(&mut stream1, &mut pipeline).await {
-                        Ok(_) => {}
-                        Err(e) => {
-                            error!("Error while sending data to pipeline {e}");
+                tokio::spawn(
+                    async move {
+                        match copy(&mut stream1, &mut pipeline).await {
+                            Ok(_) => {}
+                            Err(e) => {
+                                error!("Error while sending data to pipeline {e}");
+                            }
                         }
                     }
-                }.in_current_span());
-                tokio::spawn(async move {
-                    match store.write(chunk_id.clone(), &mut stream2).await {
-                        Ok(_) => {}
-                        Err(e) => {
-                            error!("Error while writing data to store {e}");
+                    .in_current_span(),
+                );
+                tokio::spawn(
+                    async move {
+                        match store.write(chunk_id.clone(), &mut stream2).await {
+                            Ok(_) => {}
+                            Err(e) => {
+                                error!("Error while writing data to store {e}");
+                            }
                         }
                     }
-                }.in_current_span());
+                    .in_current_span(),
+                );
             } else {
                 store.write(chunk_id, &mut tcp_stream).await?;
             }

@@ -17,7 +17,7 @@ use state_mantainer::StateMantainer;
 use std::{error::Error, sync::Arc};
 use tokio::sync::Mutex;
 use tonic::transport::Server;
-use utilities::logger::{Level, error, info, init_logger, span};
+use utilities::logger::{error, info, init_logger};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -27,8 +27,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
         std::env::var("EXTERNAL_GRPC_ADDRS").unwrap_or(format!("http://127.0.0.1:{}", grpc_port));
     let namenode_id = std::env::var("NAMENODE_ID").unwrap_or(format!("namenode_{grpc_port}"));
     let _gaurd = init_logger("Namenode", &namenode_id);
-    let root_span = span!(Level::INFO, "root", service = "Namenode",node_id=%namenode_id);
-    let _entered = root_span.enter();
+    //let root_span = span!(Level::INFO, "root", service = "Namenode",node_id=%namenode_id);
+    //let _entered = root_span.enter();
     info!("Starting the grpc server on address : {external_grpc_addrs}");
     let ledger_file = match &env[..] {
         "local" => "./temp/namenode/history.log",

@@ -21,7 +21,7 @@ impl PeerService {
         let channel = GRPC_CHANNEL_POOL.get_channel(addrs).await?;
         Ok(PeerClient::new(channel))
     }
-    #[instrument(name="service_peer_create_pipeline",skip(self))]
+    #[instrument(name = "service_peer_create_pipeline", skip(self))]
     pub async fn create_pipeline(
         &self,
         chunk_id: &str,
@@ -54,7 +54,7 @@ impl PeerService {
         let create_pipelince_response = response.get_ref();
         Ok(create_pipelince_response.address.to_owned())
     }
-    #[instrument(name="service_peer_commit_chunk",skip(self))]
+    #[instrument(name = "service_peer_commit_chunk", skip(self))]
     pub async fn commit_chunk(&self, chunk_id: &str, addrs: &str) -> Result<bool> {
         let response = retry_with_backoff(
             || async {
@@ -64,16 +64,12 @@ impl PeerService {
                 let mut client = self.get_grpc_connection(addrs).await?;
                 let request = tonic::Request::new(commit_chunk_request);
                 client.commit_chunk(request).await.map_err(|e| {
-                    format!(
-                        "error while sending the commit message, error : {}",
-                        e
-                    )
-                    .into()
+                    format!("error while sending the commit message, error : {}", e).into()
                 })
-
             },
             3,
-        ).await?;
+        )
+        .await?;
         let commit_chunk_response = response.into_inner();
         Ok(commit_chunk_response.committed)
     }
