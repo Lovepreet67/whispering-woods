@@ -1,0 +1,2 @@
+client_id: "client_0"
+namenode_addrs: "http://host.docker.internal:7000"

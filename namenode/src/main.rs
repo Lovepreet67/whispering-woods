@@ -1,5 +1,6 @@
 mod chunk_generator;
 mod client_handler;
+mod config;
 mod data_structure;
 mod datanode;
 mod ledger;
@@ -7,6 +8,7 @@ mod namenode_state;
 mod state_mantainer;
 
 use client_handler::ClientHandler;
+use config::CONFIG;
 use datanode::handler::DatanodeHandler;
 use ledger::{default_ledger::DefaultLedger, replayer::Replayer};
 use proto::generated::{
@@ -21,21 +23,12 @@ use utilities::logger::{error, info, init_logger};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let env = std::env::var("ENV").unwrap_or("local".to_owned());
-    let grpc_port = std::env::var("INTERNAL_GRPC_PORT").unwrap_or("3000".to_owned());
-    let external_grpc_addrs =
-        std::env::var("EXTERNAL_GRPC_ADDRS").unwrap_or(format!("http://127.0.0.1:{}", grpc_port));
-    let namenode_id = std::env::var("NAMENODE_ID").unwrap_or(format!("namenode_{grpc_port}"));
-    let _gaurd = init_logger("Namenode", &namenode_id);
+    let _gaurd = init_logger("Namenode", &CONFIG.id, CONFIG.log_level.clone());
     //let root_span = span!(Level::INFO, "root", service = "Namenode",node_id=%namenode_id);
     //let _entered = root_span.enter();
-    info!("Starting the grpc server on address : {external_grpc_addrs}");
-    let ledger_file = match &env[..] {
-        "local" => "./temp/namenode/history.log",
-        _ => "/state/history.log",
-    };
-    info!(path=%ledger_file,"Creating a ledger");
-    let ledger = match DefaultLedger::new(ledger_file).await {
+    info!(grcp_addrs=%CONFIG.external_grpc_addrs,"Starting the grpc server on address");
+    info!(path=%CONFIG.ledger_file,"Creating a ledger");
+    let ledger = match DefaultLedger::new(&CONFIG.ledger_file).await {
         Ok(v) => v,
         Err(e) => {
             error!(error=%e,"Error while intiating the ledger Hence shuting down");
@@ -61,7 +54,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .add_service(DatanodeNamenodeServer::new(DatanodeHandler::new(
             state.clone(),
         )))
-        .serve(format!("0.0.0.0:{grpc_port}").parse()?)
+        .serve(format!("0.0.0.0:{}", CONFIG.internal_grpc_port).parse()?)
         .await?;
     Ok(())
 }

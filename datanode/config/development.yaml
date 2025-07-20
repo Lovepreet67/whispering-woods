@@ -1,0 +1,7 @@
+client_id: "client_0"
+namenode_addrs: "http://host.docker.internal:7000"
+internal_grpc_port: "3000"
+internal_tcp_port: "3001"
+external_grpc_addrs: "http://127.0.0.1:3000"
+external_tcp_addrs: "127.0.0.1:3001"
+storage_path: "./temp"

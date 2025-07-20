@@ -1,7 +1,6 @@
 use opentelemetry::{KeyValue, runtime::Tokio};
 use opentelemetry_otlp::{WithExportConfig, new_exporter, new_pipeline};
 use opentelemetry_sdk::{Resource, trace::Tracer};
-use tracing::level_filters::LevelFilter;
 use tracing_appender::{
     non_blocking::WorkerGuard,
     rolling::{RollingFileAppender, Rotation},
@@ -34,7 +33,7 @@ pub fn init_apm(service_name: &str, node_id: &str, endpoint: &str) -> Result<Tra
         .unwrap();
     Ok(tracer)
 }
-pub fn init_logger(service_name: &str, node_id: &str) -> WorkerGuard {
+pub fn init_logger(service_name: &str, node_id: &str, level: String) -> WorkerGuard {
     let env = std::env::var("ENV").unwrap_or("local".to_owned());
     let log_base = match &env[..] {
         "local" => "/Users/lovepreetsingh/Library/Logs/whispiring_woods",
@@ -58,7 +57,7 @@ pub fn init_logger(service_name: &str, node_id: &str) -> WorkerGuard {
         .flatten_event(true);
     let stdout_layer = fmt::layer().with_writer(std::io::stdout);
     let filter = EnvFilter::builder()
-        .with_default_directive(LevelFilter::INFO.into())
+        .with_default_directive(level.parse::<Level>().unwrap_or(Level::INFO).into())
         .from_env_lossy();
 
     // code related to telemetry

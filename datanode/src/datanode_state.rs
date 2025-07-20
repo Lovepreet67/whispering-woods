@@ -3,34 +3,18 @@ use std::collections::HashMap;
 use tokio::net::TcpStream;
 #[derive(Debug)]
 pub struct DatanodeState {
-    id: String,
     pub chunk_to_pipline: HashMap<String, TcpStream>,
-    pub tcp_server_addrs: String,
-    pub grpc_server_addrs: String,
-    pub namenode_addrs: String,
     pub available_storage: usize,
     pub available_chunks: Vec<String>,
     pub chunk_to_next_replica: HashMap<String, String>, // this will store the address of next
 }
 impl DatanodeState {
-    pub fn new(
-        id: String,
-        grpc_server_addrs: String,
-        tcp_server_addrs: String,
-        namenode_addrs: String,
-    ) -> Self {
+    pub fn new() -> Self {
         Self {
-            id,
             chunk_to_pipline: HashMap::default(),
-            grpc_server_addrs,
-            tcp_server_addrs,
-            namenode_addrs,
             available_storage: 0,
             available_chunks: vec![],
             chunk_to_next_replica: HashMap::default(),
         }
-    }
-    pub fn get_id(&self) -> String {
-        self.id.clone()
     }
 }

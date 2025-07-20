@@ -1,4 +1,4 @@
-use std::{error::Error, sync::Arc};
+use std::sync::Arc;
 
 use proto::generated::datanode_namenode::{
     ConnectionRequest, HeartBeatRequest, StateSyncRequest,
@@ -12,7 +12,7 @@ use utilities::{
     result::Result,
 };
 
-use crate::datanode_state::DatanodeState;
+use crate::{config::CONFIG, datanode_state::DatanodeState};
 
 pub struct NamenodeService {
     state: Arc<Mutex<DatanodeState>>,
@@ -27,18 +27,13 @@ impl NamenodeService {
     }
     #[instrument(name = "service_namenode_connect", skip(self))]
     pub async fn connect(&self) -> Result<bool> {
-        let state = self.state.lock().await;
-        let namenode_addrs = state.namenode_addrs.clone();
-        let id = state.get_id();
-        let grpc_server_addrs = state.grpc_server_addrs.clone();
-        drop(state);
         // now we will send connection Request
         let connection_request = ConnectionRequest {
-            name: id.clone(),
-            id,
-            addrs: grpc_server_addrs,
+            name: CONFIG.datanode_id.clone(),
+            id:CONFIG.datanode_id.clone(),
+            addrs: CONFIG.external_grpc_addrs.clone(),
         };
-        let mut namenode_client = self.get_grpc_connection(&namenode_addrs).await?;
+        let mut namenode_client = self.get_grpc_connection(&CONFIG.namenode_addrs).await?;
         match namenode_client
             .connection(tonic::Request::new(connection_request))
             .await
@@ -55,13 +50,9 @@ impl NamenodeService {
     }
     #[instrument(name = "service_namenode_send_heart_beat", skip(self))]
     pub async fn send_heart_beat(&self) -> Result<()> {
-        let state = self.state.lock().await;
-        let namenode_addrs = state.namenode_addrs.clone();
-        let id = state.get_id();
-        drop(state);
         // now we will send this address to the datanode
-        let heart_beat_request = HeartBeatRequest { datanode_id: id };
-        let mut namenode_client = self.get_grpc_connection(&namenode_addrs).await?;
+        let heart_beat_request = HeartBeatRequest { datanode_id: CONFIG.datanode_id.clone() };
+        let mut namenode_client = self.get_grpc_connection(&CONFIG.namenode_addrs).await?;
         namenode_client
             .heart_beat(tonic::Request::new(heart_beat_request))
             .await?;
@@ -70,15 +61,14 @@ impl NamenodeService {
     #[instrument(name = "service_namenode_state_sync", skip(self))]
     pub async fn state_sync(&self) -> Result<()> {
         let state = self.state.lock().await;
-        let namenode_addrs = state.namenode_addrs.clone();
         trace!(?state, "sending state sync with");
         let state_sync_request = StateSyncRequest {
-            id: state.get_id(),
+            id: CONFIG.datanode_id.clone(),
             available_chunks: state.available_chunks.clone(),
             availabe_storage: state.available_storage as u64,
         };
         drop(state);
-        let mut namenode_client = self.get_grpc_connection(&namenode_addrs).await?;
+        let mut namenode_client = self.get_grpc_connection(&CONFIG.namenode_addrs).await?;
         namenode_client
             .state_sync(tonic::Request::new(state_sync_request))
             .await?;

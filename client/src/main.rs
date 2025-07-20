@@ -1,5 +1,6 @@
 use std::{error::Error, io};
 
+use crate::config::CONFIG;
 use command_runner::CommandRunner;
 use proto::generated::client_namenode::client_name_node_client::ClientNameNodeClient;
 use utilities::{
@@ -8,25 +9,16 @@ use utilities::{
 };
 mod chunk_joiner;
 mod command_runner;
+mod config;
 mod datanode_service;
 mod file_chunker;
 mod namenode_service;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
-    let client_id = std::env::var("CLIENT_NAME").unwrap_or("Client_0".to_owned());
-    let _gaurd = logger::init_logger("Client", &client_id);
-    //let root_span = span!(Level::INFO, "root", service = "Client",%client_id);
-    //let _entered = root_span.enter();
-    let namenode_addrs = match std::env::var("NAMENODE_ADDRS") {
-        Ok(v) => v,
-        Err(e) => {
-            error!(error=%e,"Error while fetching namenode address hence shutting down");
-            return Err("Namenode address not found".into());
-        }
-    };
-    info!(namenode_addrs = %namenode_addrs,"starting the Client");
-    info!("connecting to namenode");
-    let namenode_channel = match GRPC_CHANNEL_POOL.get_channel(&namenode_addrs).await {
+    let _gaurd = logger::init_logger("Client", &CONFIG.client_id,CONFIG.log_level.clone());
+    info!("Starting the Client");
+    info!(namenode_addrs = %CONFIG.namenode_addrs,"Connecting to Namenode");
+    let namenode_channel = match GRPC_CHANNEL_POOL.get_channel(&CONFIG.namenode_addrs).await {
         Ok(v) => v,
         Err(e) => {
             error!(error = %e,"Error while creating namnode channel so shutting down");

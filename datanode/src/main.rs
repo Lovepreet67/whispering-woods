@@ -4,6 +4,7 @@ mod namenode;
 mod peer;
 mod state_mantainer;
 mod tcp;
+mod config;
 
 use client::handler::ClientHandler;
 use datanode_state::DatanodeState;
@@ -22,61 +23,34 @@ use tokio::time::sleep;
 use tonic::transport::Server;
 use utilities::logger::{error, info, init_logger, trace};
 
+use crate::config::CONFIG;
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let env = std::env::var("ENV").unwrap_or("local".to_owned());
-
-    // For now we are using default port only
-    let grpc_port = std::env::var("INTERNAL_GRPC_PORT").unwrap_or("3000".to_owned());
-    let tcp_port = std::env::var("INTERNAL_TCP_PORT").unwrap_or("3001".to_owned());
-
-    let external_grpc_addrs =
-        std::env::var("EXTERNAL_GRPC_ADDRS").unwrap_or(format!("http://127.0.0.1:{}", grpc_port));
-    let external_tcp_addrs =
-        std::env::var("EXTERNAL_TCP_ADDRS").unwrap_or(format!("127.0.0.1:{}", tcp_port));
-
-    let datanode_id = std::env::var("NODE_ID").unwrap_or(grpc_port.clone());
-    let _gaurd = init_logger("Datanode", &datanode_id);
-    //let root_span = span!(Level::INFO, "root", service = "Datanode",%env,node_id=%datanode_id);
-    //let _entered = root_span.enter();
-    let namenode_addrs = match std::env::var("NAMENODE_ADDRS") {
-        Ok(v) => v,
-        Err(e) => {
-            error!(error= %e,"Error while getting namenode address hence shutting down");
-            return Err("Error while getting namenode addrs".into());
-        }
-    };
-    info!("Starting the grpc server on address : {external_grpc_addrs}");
-    let state = Arc::new(Mutex::new(DatanodeState::new(
-        datanode_id.clone(),
-        external_grpc_addrs.clone(),
-        external_tcp_addrs.clone(),
-        namenode_addrs,
-    )));
-    let storage_path = match &env[..] {
-        "local" => format!("./temp/{}", datanode_id),
-        _ => "data".to_owned(),
-    };
-    info!(%storage_path,"Creating storage");
-    let store = file_storage::FileStorage::new(storage_path);
+    let _gaurd = init_logger("Datanode", &CONFIG.datanode_id,CONFIG.log_level.clone());
+    info!(grpc_server_addrs=CONFIG.external_grpc_addrs,"Starting the grpc server on address");
+    let state = Arc::new(Mutex::new(DatanodeState::new()));
+    info!(storage_path=%CONFIG.storage_path,"Creating storage");
+    let store = file_storage::FileStorage::new(CONFIG.storage_path.clone());
 
     let ch = ClientHandler::new(state.clone(), store.clone());
     let ph = peer::handler::PeerHandler::new(state.clone(), store.clone());
     // first we will start grpc server
-    info!(grpc_addr = %external_grpc_addrs,"Creating grpc server");
+    info!(grpc_addr = %CONFIG.external_grpc_addrs,"Creating grpc server");
     let grpc_server = Server::builder()
         .add_service(ClientDataNodeServer::new(ch))
         .add_service(PeerServer::new(ph))
         .add_service(NamenodeDatanodeServer::new(NamenodeHandler::new(
             store.clone(),
         )))
-        .serve(format!("0.0.0.0:{grpc_port}").parse()?);
+        .serve(format!("0.0.0.0:{}",CONFIG.internal_grpc_port).parse()?);
     tokio::spawn(grpc_server);
-    info!(grpc_addrs = %external_grpc_addrs,"grpc server is now running");
+    info!(grpc_addrs = %CONFIG.external_grpc_addrs,"grpc server is now running");
     // we will create storage which will be used by the tcp service to serve a file
-    info!(tcp_addrs = %external_tcp_addrs,"Starting the tcp server");
+    info!(tcp_addrs = %CONFIG.external_tcp_addrs,"Starting the tcp server");
     let tcp_handler = tcp::service::TCPService::new(
-        format!("0.0.0.0:{tcp_port}").clone(),
+        format!("0.0.0.0:{}",CONFIG.internal_tcp_port).clone(),
         store.clone(),
         state.clone(),
     )
@@ -89,7 +63,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             }
         }
     });
-    info!(tcp_addrs = %external_tcp_addrs,"TCP server is running now");
+    info!(tcp_addrs = %CONFIG.external_tcp_addrs,"TCP server is running now");
 
     // starting datanode state mantainer for datanode
     let state_mantainer = StateMantainer::new(store.clone(), state.clone());
