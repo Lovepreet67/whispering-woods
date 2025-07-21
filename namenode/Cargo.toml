@@ -10,3 +10,6 @@ async-trait = "0.1.88"
 uuid = { version = "1.17.0", features = ["v4"]}
 proto = {path="../proto"}
 utilities = {path = "../utilities"}
+figment = {version="0.10.19", features=["yaml"]}
+serde = { version = "1.0.219", features = ["derive"] }
+once_cell = "1.21.3"

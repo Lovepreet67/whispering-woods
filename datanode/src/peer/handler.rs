@@ -11,7 +11,7 @@ use utilities::{
     result::Result,
 };
 
-use crate::{datanode_state::DatanodeState, peer::service::PeerService};
+use crate::{config::CONFIG, datanode_state::DatanodeState, peer::service::PeerService};
 pub struct PeerHandler {
     state: Arc<Mutex<DatanodeState>>,
     peer_service: PeerService,
@@ -83,7 +83,7 @@ impl Peer for PeerHandler {
             );
         }
         let response = CreatePipelineResponse {
-            address: self.state.lock().await.tcp_server_addrs.clone(),
+            address: CONFIG.external_tcp_addrs.clone(),
         };
         Ok(tonic::Response::new(response))
     }

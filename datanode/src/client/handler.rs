@@ -10,6 +10,7 @@ use tokio::sync::Mutex;
 use utilities::logger::{error, instrument, trace, tracing};
 use utilities::tcp_pool::TCP_CONNECTION_POOL;
 
+use crate::config::CONFIG;
 use crate::datanode_state::DatanodeState;
 use crate::peer::service::PeerService;
 
@@ -86,7 +87,7 @@ impl ClientDataNode for ClientHandler {
             );
         }
         let response = StoreChunkResponse {
-            address: self.state.lock().await.tcp_server_addrs.clone(),
+            address: CONFIG.external_tcp_addrs.clone(),
         };
         Ok(tonic::Response::new(response))
     }
@@ -158,7 +159,7 @@ impl ClientDataNode for ClientHandler {
             ));
         }
         let fetch_chunk_response = FetchChunkResponse {
-            address: state.tcp_server_addrs.clone(),
+            address: CONFIG.external_tcp_addrs.clone(),
         };
         Ok(tonic::Response::new(fetch_chunk_response))
     }

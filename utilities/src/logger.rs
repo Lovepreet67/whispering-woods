@@ -34,12 +34,13 @@ pub fn init_apm(service_name: &str, node_id: &str, endpoint: &str) -> Result<Tra
         .unwrap();
     Ok(tracer)
 }
-pub fn init_logger(service_name: &str, node_id: &str) -> WorkerGuard {
-    let env = std::env::var("ENV").unwrap_or("local".to_owned());
-    let log_base = match &env[..] {
-        "local" => "/Users/lovepreetsingh/Library/Logs/whispiring_woods",
-        _ => "logs",
-    };
+pub fn init_logger(
+    service_name: &str,
+    node_id: &str,
+    level: String,
+    apm_endpoint: &str,
+    log_base: &str,
+) -> WorkerGuard {
     let file_appender = RollingFileAppender::new(
         Rotation::NEVER,
         format!("{log_base}/{}", service_name),
@@ -58,13 +59,16 @@ pub fn init_logger(service_name: &str, node_id: &str) -> WorkerGuard {
         .flatten_event(true);
     let stdout_layer = fmt::layer().with_writer(std::io::stdout);
     let filter = EnvFilter::builder()
-        .with_default_directive(LevelFilter::INFO.into())
+        .with_default_directive(LevelFilter::OFF.into())
+        .with_default_directive(
+            format!("{}={}", env!("CARGO_PKG_NAME"), level)
+                .parse()
+                .unwrap(),
+        )
         .from_env_lossy();
-
     // code related to telemetry
-    let apm_endpoint = std::env::var("APM_ENDPOINT").unwrap_or("http://locahost:8200".to_owned());
     // for opentelemetry export
-    let tracer = match init_apm(service_name, node_id, &apm_endpoint) {
+    let tracer = match init_apm(service_name, node_id, apm_endpoint) {
         Ok(v) => v,
         Err(e) => {
             error!("Error while creating tracer endpoint:{apm_endpoint}, error:{e:?}");

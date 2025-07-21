@@ -54,6 +54,7 @@ impl Storage for FileStorage {
         let chunk_path = self.get_staged_path(&chunk_id);
         let mut chunk_file = File::create_new(chunk_path).await?;
         let writer_byte_count = copy(chunk_stream, &mut chunk_file).await?;
+        info!(%chunk_id,"data copied successfully");
         Ok(writer_byte_count)
     }
     #[instrument(name = "file_storage_commit", skip(self))]
