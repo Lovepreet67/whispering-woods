@@ -1,7 +1,7 @@
-id: namenode 
-internal_grpc_port: "7000" 
+id: namenode
+internal_grpc_port: "7000"
 external_grpc_addrs: http://127.0.0.1:7000,
-ledger_file: ./temp/namenode/history.log  
-log_level: trace 
+ledger_file: ./temp/namenode/history.log
+log_level: trace
 log_base: ./temp/namenode/
 apm_endpoint:  http://127.0.0.1:8200/v1/traces

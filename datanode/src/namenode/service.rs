@@ -30,7 +30,7 @@ impl NamenodeService {
         // now we will send connection Request
         let connection_request = ConnectionRequest {
             name: CONFIG.datanode_id.clone(),
-            id:CONFIG.datanode_id.clone(),
+            id: CONFIG.datanode_id.clone(),
             addrs: CONFIG.external_grpc_addrs.clone(),
         };
         let mut namenode_client = self.get_grpc_connection(&CONFIG.namenode_addrs).await?;
@@ -51,7 +51,9 @@ impl NamenodeService {
     #[instrument(name = "service_namenode_send_heart_beat", skip(self))]
     pub async fn send_heart_beat(&self) -> Result<()> {
         // now we will send this address to the datanode
-        let heart_beat_request = HeartBeatRequest { datanode_id: CONFIG.datanode_id.clone() };
+        let heart_beat_request = HeartBeatRequest {
+            datanode_id: CONFIG.datanode_id.clone(),
+        };
         let mut namenode_client = self.get_grpc_connection(&CONFIG.namenode_addrs).await?;
         namenode_client
             .heart_beat(tonic::Request::new(heart_beat_request))

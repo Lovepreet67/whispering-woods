@@ -15,7 +15,13 @@ mod file_chunker;
 mod namenode_service;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
-    let _gaurd = logger::init_logger("Client", &CONFIG.client_id,CONFIG.log_level.clone());
+    let _gaurd = logger::init_logger(
+        "Client",
+        &CONFIG.client_id,
+        CONFIG.log_level.clone(),
+        &CONFIG.apm_endpoint,
+        &CONFIG.log_base,
+    );
     info!("Starting the Client");
     info!(namenode_addrs = %CONFIG.namenode_addrs,"Connecting to Namenode");
     let namenode_channel = match GRPC_CHANNEL_POOL.get_channel(&CONFIG.namenode_addrs).await {

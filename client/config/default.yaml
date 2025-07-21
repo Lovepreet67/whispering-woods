@@ -1,5 +1,5 @@
 client_id: "client_0"
-namenode_addrs: "http://127.0.0.1:7000"
+namenode_addrs: "http://host.docker.internal:7000"
 log_level: trace
 log_base: ./temp/client/
 apm_endpoint: http://127.0.0.1:8200/v1/traces

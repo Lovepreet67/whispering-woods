@@ -23,7 +23,13 @@ use utilities::logger::{error, info, init_logger};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let _gaurd = init_logger("Namenode", &CONFIG.id, CONFIG.log_level.clone());
+    let _gaurd = init_logger(
+        "Namenode",
+        &CONFIG.id,
+        CONFIG.log_level.clone(),
+        &CONFIG.apm_endpoint,
+        &CONFIG.log_base,
+    );
     //let root_span = span!(Level::INFO, "root", service = "Namenode",node_id=%namenode_id);
     //let _entered = root_span.enter();
     info!(grcp_addrs=%CONFIG.external_grpc_addrs,"Starting the grpc server on address");

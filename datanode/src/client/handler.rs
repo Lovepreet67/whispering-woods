@@ -87,7 +87,7 @@ impl ClientDataNode for ClientHandler {
             );
         }
         let response = StoreChunkResponse {
-            address: CONFIG.external_tcp_addrs.clone()
+            address: CONFIG.external_tcp_addrs.clone(),
         };
         Ok(tonic::Response::new(response))
     }
@@ -159,7 +159,7 @@ impl ClientDataNode for ClientHandler {
             ));
         }
         let fetch_chunk_response = FetchChunkResponse {
-            address: CONFIG.external_tcp_addrs.clone()
+            address: CONFIG.external_tcp_addrs.clone(),
         };
         Ok(tonic::Response::new(fetch_chunk_response))
     }

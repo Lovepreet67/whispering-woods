@@ -4,8 +4,7 @@ set -e
 
 # this scrip assumes that you have gfs-namenode and gfs-datanode present in docker and ek (elastic search and kibana are running) 
 # Set ENV variable globally
-export ENV="Cluster"
-export APM_ENDPOINT="http://host.docker.internal:8200/v1/traces"
+export ENV="container"
 
 # Here we are mapping host.docker.internal to resolve to local host on local machine 
 # so that we can use same address inside container and host machine
@@ -18,10 +17,8 @@ echo "starting namenode"
 docker run -d \
   -p 7000:7000 \
   -e ENV=$ENV \
-  -e INTERNAL_GRPC_PORT=7000 \
-  -e NODE_ID=namenode_0 \
-  -e RUST_LOG=namenode=trace \
-  -e APM_ENDPOINT=$APM_ENDPOINT \
+  -e CONFIG_PATH="./container.yaml" \
+  -v "$(pwd)/namenode/config/container.yaml":/app/container.yaml \
   --name gfs-namenode \
   gfs-namenode
 echo "Namenode running"
@@ -35,9 +32,9 @@ sleep 3
 
 DATANODE_COUNT=${1:-3}  # default to 3 if no argument is passed
 echo "Starting $DATANODE_COUNT DataNodes..."
-for ((i = 1; i <= DATANODE_COUNT; i++)); do
-  grpc_port=$((3000 + i * 10))
-  tcp_port=$((3001 + i * 10))
+for ((i = 0; i < DATANODE_COUNT; i++)); do
+  grpc_port=$((3000 + i*10))
+  tcp_port=$((3001 + i*10))
   echo "Starting $i DataNode..."
 
   docker run -d \
@@ -45,14 +42,8 @@ for ((i = 1; i <= DATANODE_COUNT; i++)); do
     -p ${grpc_port}:3000 \
     -p ${tcp_port}:3001 \
     -e ENV=$ENV \
-    -e NODE_ID=datanode_$i \
-    -e INTERNAL_GRPC_PORT=3000 \
-    -e EXTERNAL_GRPC_ADDRS=http://host.docker.internal:${grpc_port} \
-    -e INTERNAL_TCP_PORT=3001 \
-    -e EXTERNAL_TCP_ADDRS=host.docker.internal:${tcp_port} \
-    -e NAMENODE_ADDRS=http://host.docker.internal:7000 \
-    -e RUST_LOG=datanode=trace,utilities=trace,storage=trace  \
-    -e APM_ENDPOINT=$APM_ENDPOINT \
+    -e CONFIG_PATH="./container.yaml" \
+    -v "$(pwd)/cluster_configs/datanode/datanode${i}.yaml":/app/container.yaml \
     gfs-datanode
 done
 
@@ -60,4 +51,4 @@ done
 echo "Cluster started with $DATANODE_COUNT datanodes."
 echo "Starting a client"
 export NAMENODE_ADDRS="http://host.docker.internal:7000"
-RUST_LOG=client=trace,utilities=trace  APM_ENDPOINT=$APM_ENDPOINT cargo run -p client
+ENV=default RUST_LOG=client=trace,utilities=trace  APM_ENDPOINT=$APM_ENDPOINT cargo run -p client

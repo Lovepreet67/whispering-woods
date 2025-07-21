@@ -1,10 +1,10 @@
 mod client;
+mod config;
 mod datanode_state;
 mod namenode;
 mod peer;
 mod state_mantainer;
 mod tcp;
-mod config;
 
 use client::handler::ClientHandler;
 use datanode_state::DatanodeState;
@@ -27,9 +27,17 @@ use crate::config::CONFIG;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let env = std::env::var("ENV").unwrap_or("local".to_owned());
-    let _gaurd = init_logger("Datanode", &CONFIG.datanode_id,CONFIG.log_level.clone());
-    info!(grpc_server_addrs=CONFIG.external_grpc_addrs,"Starting the grpc server on address");
+    let _gaurd = init_logger(
+        "Datanode",
+        &CONFIG.datanode_id,
+        CONFIG.log_level.clone(),
+        &CONFIG.apm_endpoint,
+        &CONFIG.log_base,
+    );
+    info!(
+        grpc_server_addrs = CONFIG.external_grpc_addrs,
+        "Starting the grpc server on address"
+    );
     let state = Arc::new(Mutex::new(DatanodeState::new()));
     info!(storage_path=%CONFIG.storage_path,"Creating storage");
     let store = file_storage::FileStorage::new(CONFIG.storage_path.clone());
@@ -44,13 +52,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .add_service(NamenodeDatanodeServer::new(NamenodeHandler::new(
             store.clone(),
         )))
-        .serve(format!("0.0.0.0:{}",CONFIG.internal_grpc_port).parse()?);
+        .serve(format!("0.0.0.0:{}", CONFIG.internal_grpc_port).parse()?);
     tokio::spawn(grpc_server);
     info!(grpc_addrs = %CONFIG.external_grpc_addrs,"grpc server is now running");
     // we will create storage which will be used by the tcp service to serve a file
     info!(tcp_addrs = %CONFIG.external_tcp_addrs,"Starting the tcp server");
     let tcp_handler = tcp::service::TCPService::new(
-        format!("0.0.0.0:{}",CONFIG.internal_tcp_port).clone(),
+        format!("0.0.0.0:{}", CONFIG.internal_tcp_port).clone(),
         store.clone(),
         state.clone(),
     )
