@@ -62,7 +62,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
         store.clone(),
         state.clone(),
     )
-    .await?;
+    .await
+    .unwrap();
     tokio::spawn(async move {
         match tcp_handler.start_and_accept().await {
             Ok(_) => {}

@@ -55,13 +55,13 @@ pub fn init_logger(
         .with_thread_names(true)
         .with_current_span(true)
         .with_target(true)
-        .with_span_events(FmtSpan::ENTER | FmtSpan::EXIT)
+        //.with_span_events(FmtSpan::ENTER | FmtSpan::EXIT)
         .flatten_event(true);
     let stdout_layer = fmt::layer().with_writer(std::io::stdout);
     let filter = EnvFilter::builder()
         .with_default_directive(LevelFilter::OFF.into())
         .with_default_directive(
-            format!("{}={}", env!("CARGO_PKG_NAME"), level)
+            format!("{}={}", service_name.to_owned().to_lowercase(), level)
                 .parse()
                 .unwrap(),
         )

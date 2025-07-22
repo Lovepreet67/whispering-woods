@@ -19,7 +19,6 @@ impl GrpcChannelPool {
     #[instrument(name = "grpc_pool_get_channel", skip(self))]
     pub async fn get_channel(&self, addrs: &str) -> Result<Channel> {
         if let Some(chnl) = self.store.lock().await.get(addrs) {
-            trace!("Channel already present");
             return Ok(chnl.clone());
         }
         trace!("Creating endpoint for channel since channel is not present already");

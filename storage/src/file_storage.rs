@@ -1,10 +1,7 @@
-use std::{
-    error::Error,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 use tracing::{error, info, instrument};
 
-use crate::storage::Storage;
+use crate::storage::{Result, Storage};
 use tokio::{
     fs::{self, File},
     io::copy,
@@ -50,7 +47,7 @@ impl Storage for FileStorage {
         &self,
         chunk_id: String,
         chunk_stream: &mut (impl tokio::io::AsyncRead + Unpin),
-    ) -> Result<u64, Box<dyn Error>> {
+    ) -> Result<u64> {
         let chunk_path = self.get_staged_path(&chunk_id);
         let mut chunk_file = File::create_new(chunk_path).await?;
         let writer_byte_count = copy(chunk_stream, &mut chunk_file).await?;
@@ -58,7 +55,7 @@ impl Storage for FileStorage {
         Ok(writer_byte_count)
     }
     #[instrument(name = "file_storage_commit", skip(self))]
-    async fn commit(&self, chunk_id: String) -> Result<bool, Box<dyn Error>> {
+    async fn commit(&self, chunk_id: String) -> Result<bool> {
         // check if file is in staged area
         let staged_path = self.get_staged_path(&chunk_id);
         let committed_path = self.get_committed_path(&chunk_id);
@@ -72,15 +69,12 @@ impl Storage for FileStorage {
         Ok(true)
     }
     #[instrument(name = "file_storage_read", skip(self))]
-    async fn read(
-        &self,
-        chunk_id: String,
-    ) -> Result<Box<dyn tokio::io::AsyncRead + Unpin + Send>, Box<dyn Error>> {
+    async fn read(&self, chunk_id: String) -> Result<Box<dyn tokio::io::AsyncRead + Unpin + Send>> {
         let chunk_path = self.get_committed_path(&chunk_id);
         let chunk_file = File::open(chunk_path).await?;
         Ok(Box::new(chunk_file))
     }
-    async fn delete(&self, chunk_id: String) -> Result<bool, Box<dyn Error>> {
+    async fn delete(&self, chunk_id: String) -> Result<bool> {
         let exists = match fs::try_exists(self.get_committed_path(&chunk_id)).await {
             Ok(v) => v,
             Err(e) => {
@@ -94,7 +88,7 @@ impl Storage for FileStorage {
         Ok(exists)
     }
     #[instrument(name = "file_storage_available_chunk", skip(self))]
-    async fn available_chunks(&self) -> Result<Vec<String>, Box<dyn Error>> {
+    async fn available_chunks(&self) -> Result<Vec<String>> {
         info!(root=%self.root,"Reading the dir to get available chunks");
         let mut dir_enteries = fs::read_dir(&self.root).await?;
         let mut chunk_ids = vec![];
@@ -120,7 +114,7 @@ mod tests {
 
     use super::*;
     #[tokio::test]
-    async fn file_storage_test() -> Result<(), Box<dyn Error>> {
+    async fn file_storage_test() -> Result<()> {
         let storage = FileStorage::new("./temp".into());
         fs::create_dir_all(&storage.root).await?;
         let test_result = storage_test(storage).await; // we have to await here because other wise

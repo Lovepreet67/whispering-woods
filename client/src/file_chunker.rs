@@ -18,7 +18,7 @@ impl FileChunk {
             .open(&self.file_path)
             .await
             .map_err(|e| format!("Error while openning the file for chunk {e:?}"))?;
-        file.seek(tokio::io::SeekFrom::Start(self.end_offset))
+        file.seek(tokio::io::SeekFrom::Start(self.start_offset))
             .await
             .map_err(|e| format!("Error while seeking to starting offset {e:?}"))?;
         Ok(file.take(self.end_offset - self.start_offset))

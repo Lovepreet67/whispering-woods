@@ -1,19 +1,18 @@
 use std::error::Error;
 
+pub type Result<T> = std::result::Result<T, Box<dyn Error + Send + Sync>>;
+
 use tokio::io;
 pub trait Storage {
     async fn write(
         &self,
         chunk_id: String,
         chunk_stream: &mut (impl io::AsyncRead + Unpin),
-    ) -> Result<u64, Box<dyn Error>>;
-    async fn commit(&self, chunk_id: String) -> Result<bool, Box<dyn Error>>;
-    async fn read(
-        &self,
-        chunk_id: String,
-    ) -> Result<Box<dyn io::AsyncRead + Unpin + Send>, Box<dyn Error>>;
-    async fn delete(&self, chunk_id: String) -> Result<bool, Box<dyn Error>>;
-    async fn available_chunks(&self) -> Result<Vec<String>, Box<dyn Error>>;
+    ) -> Result<u64>;
+    async fn commit(&self, chunk_id: String) -> Result<bool>;
+    async fn read(&self, chunk_id: String) -> Result<Box<dyn io::AsyncRead + Unpin + Send>>;
+    async fn delete(&self, chunk_id: String) -> Result<bool>;
+    async fn available_chunks(&self) -> Result<Vec<String>>;
     async fn available_storage(&self) -> usize;
 }
 
@@ -24,7 +23,7 @@ pub mod tests {
     use tokio::io::BufReader;
 
     use super::*;
-    pub async fn storage_test(storage: impl Storage) -> Result<(), Box<dyn Error>> {
+    pub async fn storage_test(storage: impl Storage) -> Result<()> {
         let chunk_id = "test_chunk.bin".to_string();
         let original_data = b"hello world";
 

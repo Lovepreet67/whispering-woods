@@ -5,11 +5,11 @@ use proto::generated::{
     },
     client_namenode::DataNodeMeta,
 };
-use tokio::io::{AsyncRead, AsyncWriteExt};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
 use tonic::transport::Channel;
 use utilities::{
     grpc_channel_pool::GRPC_CHANNEL_POOL,
-    logger::{instrument, trace, tracing},
+    logger::{error, instrument, trace, tracing},
     result::Result,
     tcp_pool::TCP_CONNECTION_POOL,
 };
@@ -53,7 +53,17 @@ impl DatanodeService {
         trace!("writing mode to file");
         tcp_stream.write_u8(1).await?;
         trace!("writing chunk to stream");
-        tokio::io::copy(&mut read_stream, &mut tcp_stream).await?;
+        let bytes_written = tokio::io::copy(&mut read_stream, &mut tcp_stream).await?;
+        trace!("{bytes_written} Bytes written");
+        tcp_stream.shutdown().await?;
+        // we will check for the number of writen bytes to stream
+        let bytes_recieved_by_datanode: u64 = tcp_stream.read_u64().await?;
+        if bytes_written != bytes_recieved_by_datanode {
+            error!(
+                "Bytes written to stream and recieved by stream are diffrent BytesWritten: {bytes_written}, BytesRecieved: {bytes_recieved_by_datanode}"
+            );
+            return Err("Bytes recieved are diffrent from bytes written".into());
+        }
         trace!("Sending commit message");
         let commit_chunk_request = CommitChunkRequest { chunk_id };
         data_node_grpc_client

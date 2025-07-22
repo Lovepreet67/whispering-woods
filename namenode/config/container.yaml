@@ -3,5 +3,5 @@ internal_grpc_port: "7000"
 external_grpc_addrs: http://127.0.0.1:7000,
 ledger_file: /app/history.log  
 log_level: trace 
-log_base: /app/
+log_base: /app/logs/
 apm_endpoint: http://host.docker.internal:8200/v1/traces

@@ -1,12 +1,15 @@
 use core::str;
-use std::{error::Error, sync::Arc};
+use std::sync::Arc;
 use storage::{file_storage::FileStorage, storage::Storage};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt, copy},
     net::{TcpListener, TcpStream},
     sync::Mutex,
 };
-use utilities::logger::{Instrument, Level, Span, error, span, trace};
+use utilities::{
+    logger::{Instrument, Level, Span, error, span, trace},
+    result::Result,
+};
 
 use crate::{datanode_state::DatanodeState, tcp::stream_tee};
 
@@ -21,7 +24,7 @@ impl TCPService {
         address: String,
         store: FileStorage,
         state: Arc<Mutex<DatanodeState>>,
-    ) -> Result<Self, Box<dyn Error>> {
+    ) -> Result<Self> {
         let listener = TcpListener::bind(address).await?;
         Ok(TCPService {
             listener,
@@ -29,7 +32,7 @@ impl TCPService {
             state,
         })
     }
-    pub async fn start_and_accept(&self) -> Result<(), Box<dyn Error>> {
+    pub async fn start_and_accept(&self) -> Result<()> {
         loop {
             let (tcp_stream, _) = self.listener.accept().await?;
             let store = self.store.clone();
@@ -49,7 +52,7 @@ impl TCPService {
         mut tcp_stream: TcpStream,
         store: FileStorage,
         state: Arc<Mutex<DatanodeState>>,
-    ) -> Result<(), Box<dyn Error>> {
+    ) -> Result<()> {
         // first we will fetch the chunk_id
         let mut chunk_id_bytes = [0u8; 36];
         tcp_stream.read_exact(&mut chunk_id_bytes).await?;
@@ -80,9 +83,14 @@ impl TCPService {
                 tokio::spawn(
                     async move {
                         match copy(&mut stream1, &mut pipeline).await {
-                            Ok(_) => {}
+                            Ok(_) => {
+                                let bytes_recieved_by_pipeline =
+                                    pipeline.read_u64().await.unwrap_or(0);
+                                let _ = stream1.write_u64(bytes_recieved_by_pipeline).await;
+                            }
                             Err(e) => {
                                 error!("Error while sending data to pipeline {e}");
+                                let _ = stream1.write_u64(0).await;
                             }
                         }
                     }
@@ -91,16 +99,27 @@ impl TCPService {
                 tokio::spawn(
                     async move {
                         match store.write(chunk_id.clone(), &mut stream2).await {
-                            Ok(_) => {}
+                            Ok(bytes_written) => {
+                                let _ = stream2.write_u64(bytes_written).await;
+                            }
                             Err(e) => {
                                 error!("Error while writing data to store {e}");
+                                let _ = stream2.write_u64(0).await;
                             }
                         }
                     }
                     .in_current_span(),
                 );
             } else {
-                store.write(chunk_id, &mut tcp_stream).await?;
+                match store.write(chunk_id, &mut tcp_stream).await {
+                    Ok(bytes_written_to_file) => {
+                        println!("{bytes_written_to_file} bytes written to file");
+                        tcp_stream.write_u64(bytes_written_to_file).await?;
+                    }
+                    Err(_) => {
+                        tcp_stream.write_u64(0).await?;
+                    }
+                }
             }
         } else if mode == 2 {
             let span = span!(Level::INFO,"service_tcp_read_chunk",%chunk_id);
