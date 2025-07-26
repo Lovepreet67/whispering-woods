@@ -1,5 +1,9 @@
-use std::path::{Path, PathBuf};
-use tracing::{error, info, instrument};
+use std::{
+    path::{self, Path, PathBuf},
+    usize,
+};
+use sysinfo::{Disk, Disks};
+use tracing::{debug, error, field::debug, info, instrument};
 
 use crate::storage::{Result, Storage};
 use tokio::{
@@ -93,17 +97,33 @@ impl Storage for FileStorage {
         let mut dir_enteries = fs::read_dir(&self.root).await?;
         let mut chunk_ids = vec![];
         while let Some(chunk) = dir_enteries.next_entry().await? {
-            chunk_ids.push(
-                chunk
-                    .file_name()
-                    .into_string()
-                    .map_err(|_| "Invalid file name")?,
-            );
+            if !chunk
+                .file_type()
+                .await
+                .map_err(|_| "Error checking if file is Dir")
+                .unwrap()
+                .is_dir()
+            {
+                chunk_ids.push(
+                    chunk
+                        .file_name()
+                        .into_string()
+                        .map_err(|_| "Invalid file name")?,
+                );
+            }
         }
         Ok(chunk_ids)
     }
-    async fn available_storage(&self) -> usize {
-        10737418240_usize
+    fn available_storage(&self) -> Result<usize> {
+        let canonical_path = std::fs::canonicalize(&self.root).unwrap();
+        let disks = Disks::new_with_refreshed_list();
+        let available_storage = disks
+            .iter()
+            .filter(|disk| canonical_path.starts_with(disk.mount_point()))
+            .max_by_key(|disk| disk.mount_point().as_os_str().len())
+            .map(|disk| disk.available_space())
+            .unwrap();
+        Ok(available_storage as usize)
     }
 }
 

@@ -1,4 +1,4 @@
-use std::error::Error;
+use std::{error::Error, usize};
 
 pub type Result<T> = std::result::Result<T, Box<dyn Error + Send + Sync>>;
 
@@ -13,7 +13,7 @@ pub trait Storage {
     async fn read(&self, chunk_id: String) -> Result<Box<dyn io::AsyncRead + Unpin + Send>>;
     async fn delete(&self, chunk_id: String) -> Result<bool>;
     async fn available_chunks(&self) -> Result<Vec<String>>;
-    async fn available_storage(&self) -> usize;
+    fn available_storage(&self) -> Result<usize>;
 }
 
 #[cfg(test)]

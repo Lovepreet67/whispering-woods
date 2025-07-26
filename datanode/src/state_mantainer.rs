@@ -30,14 +30,15 @@ impl StateMantainer {
                         continue;
                     }
                 };
-                let available_storage = /*match*/ self.store.available_storage().await;
-                /*.await{
-                    Ok(v)=>v,
-                   Err(e)=>{
-                       error!("Skipping datanode state sync: Error while fetching the available storage {e}");
-                           continue;
-                   }
-                };*/
+                let available_storage = match self.store.available_storage() {
+                    Ok(v) => v,
+                    Err(e) => {
+                        error!(
+                            "Skipping datanode state sync: Error while fetching the available storage {e}"
+                        );
+                        continue;
+                    }
+                };
                 let mut state = self.state.lock().await;
                 state.available_chunks = available_chunks;
                 state.available_storage = available_storage;

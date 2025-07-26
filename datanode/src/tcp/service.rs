@@ -7,7 +7,7 @@ use tokio::{
     sync::Mutex,
 };
 use utilities::{
-    logger::{Instrument, Level, Span, error, span, trace},
+    logger::{Instrument, Level, Span, debug, error, info, span, trace},
     result::Result,
 };
 
@@ -57,7 +57,7 @@ impl TCPService {
         let mut chunk_id_bytes = [0u8; 36];
         tcp_stream.read_exact(&mut chunk_id_bytes).await?;
         let chunk_id = str::from_utf8(&chunk_id_bytes)
-            .map_err(|e| format!("Error while converting the chunk id bytes to string {}", e))?
+            .map_err(|e| format!("Error while converting the chunk id bytes to string {e}"))?
             .to_owned();
         trace!(%chunk_id,"Got TCP stream");
         // now we will fetch the mode (client wants to read or write)
@@ -113,7 +113,6 @@ impl TCPService {
             } else {
                 match store.write(chunk_id, &mut tcp_stream).await {
                     Ok(bytes_written_to_file) => {
-                        println!("{bytes_written_to_file} bytes written to file");
                         tcp_stream.write_u64(bytes_written_to_file).await?;
                     }
                     Err(_) => {
@@ -131,11 +130,9 @@ impl TCPService {
             copy(&mut reader.take(u64::MAX), &mut tcp_stream).await?;
             tcp_stream.flush().await?;
         } else {
-            return Err(format!(
-                "accepted request for chunk id {} for unknown mode",
-                chunk_id
-            )
-            .into());
+            return Err(
+                format!("accepted request for chunk id {chunk_id} for unknown mode",).into(),
+            );
         }
         Ok(())
     }

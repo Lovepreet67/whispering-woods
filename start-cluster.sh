@@ -17,6 +17,7 @@ echo "starting namenode"
 docker run -d \
   -p 7000:7000 \
   -e ENV=$ENV \
+  -e RUST_LOG=namenode=trace \
   -e CONFIG_PATH="./container.yaml" \
   -v "$(pwd)/namenode/config/container.yaml":/app/container.yaml \
   --name gfs-namenode \
@@ -29,13 +30,25 @@ sleep 3
 # -----------------------
 # Start a datanode
 # -----------------------
+DMG_DIR="$(pwd)/disks/"
+MOUNT_BASE="/Volumes"
+DATANODE_COUNT=${1:-3}
+DISK_SIZE="1g"
 
-DATANODE_COUNT=${1:-3}  # default to 3 if no argument is passed
+mkdir -p "$DMG_DIR"
+
 echo "Starting $DATANODE_COUNT DataNodes..."
 for ((i = 0; i < DATANODE_COUNT; i++)); do
+  dmg_path="$DMG_DIR/datanode${i}.dmg"
+  mount_point="$MOUNT_BASE/datanode${i}"
+  echo "Creating disk image: $dmg_path ($DISK_SIZE)..."
+  hdiutil create -size "$DISK_SIZE" -fs APFS -volname "datanode${i}" "$dmg_path" -ov
+
+  echo "Mounting $dmg_path to $mount_point .."
+  hdiutil attach "$dmg_path" -mountpoint "$mount_point"
+
   grpc_port=$((3000 + i*10))
   tcp_port=$((3001 + i*10))
-  echo "Starting $i DataNode..."
 
   docker run -d \
     --name gfs-datanode-$i \
@@ -43,8 +56,10 @@ for ((i = 0; i < DATANODE_COUNT; i++)); do
     -p ${tcp_port}:3001 \
     -e ENV=$ENV \
     -e CONFIG_PATH="./container.yaml" \
+    -e RUST_LOG=datanode=trace,storage=trace,utilities=trace \
     -v "$(pwd)/cluster_configs/datanode/datanode${i}.yaml":/app/container.yaml \
     gfs-datanode
+    # -v "$mount_point":/app/store \
 done
 
 

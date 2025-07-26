@@ -19,10 +19,7 @@ pub fn tee_tcp_stream(mut tcp_stream: TcpStream) -> (DuplexStream, DuplexStream)
                 let n = tcp_stream.read(&mut buf).await.unwrap_or(0);
                 total_read += n;
                 if n == 0 {
-                    if let Err(e) = tcp_stream.write_u64(total_read as u64).await {
-                        error!(error=%e,"Error while writing byte count to tcp stream")
-                    }
-                    break;
+                                        break;
                 }
                 tx1.write_all(&buf[0..n]).await.unwrap();
                 tx2.write_all(&buf[0..n]).await.unwrap();

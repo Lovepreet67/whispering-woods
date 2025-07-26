@@ -2,12 +2,6 @@
 FROM rust:latest as builder
 
 WORKDIR /usr/src/app
-COPY . .
-ENV SKIP_PROTO_BUILD=1
-
-FROM rust:latest as builder
-
-WORKDIR /usr/src/app
 
 COPY . .
 
