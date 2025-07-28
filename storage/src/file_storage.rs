@@ -1,9 +1,6 @@
-use std::{
-    path::{self, Path, PathBuf},
-    usize,
-};
-use sysinfo::{Disk, Disks};
-use tracing::{debug, error, field::debug, info, instrument};
+use std::path::{Path, PathBuf};
+use sysinfo::{Disks};
+use tracing::{error, info, instrument};
 
 use crate::storage::{Result, Storage};
 use tokio::{

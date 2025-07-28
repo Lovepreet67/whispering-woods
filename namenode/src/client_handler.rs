@@ -6,7 +6,7 @@ use proto::generated::client_namenode::{
 };
 use tokio::sync::Mutex;
 use tonic::Code;
-use utilities::logger::{Level, debug, instrument, span, trace, tracing};
+use utilities::logger::{debug, instrument, trace, tracing};
 
 use crate::{
     chunk_generator::{ChunkGenerator, DefaultChunkGenerator},
@@ -73,7 +73,7 @@ impl ClientNameNode for ClientHandler {
                 .datanode_selector
                 .get_datanodes_to_store(chunk_boundery.end_offset - chunk_boundery.start_offset)
                 .await
-                .map_err(|e| tonic::Status::internal(format!("{}", e)))?;
+                .map_err(|e| tonic::Status::internal(format!("{e}")))?;
             chunk_meta.push(ChunkMeta {
                 id: chunk_boundery.chunk_id,
                 start_offset: chunk_boundery.start_offset,
@@ -122,7 +122,7 @@ impl ClientNameNode for ClientHandler {
                 let location = match self.datanode_selector.get_datanodes_to_serve(chunk).await {
                     Ok(location) => location,
                     Err(e) => {
-                        return Err(tonic::Status::not_found(format!("{}", e)));
+                        return Err(tonic::Status::not_found(format!("{e}")));
                     }
                 };
                 let chunk_boundery = match state.chunk_to_boundry_map.get(chunk) {
@@ -173,7 +173,7 @@ impl ClientNameNode for ClientHandler {
         trace!(?chunks, "got chunks ");
         for chunk in &chunks {
             self.ledger
-                .delete_chunk(&delete_file_request.file_name, &chunk)
+                .delete_chunk(&delete_file_request.file_name, chunk)
                 .await;
             if let Some(location) = state.chunk_to_location_map.get(chunk) {
                 for datanode_id in location {
@@ -198,7 +198,7 @@ impl ClientNameNode for ClientHandler {
             } else {
                 return Err(tonic::Status::new(
                     Code::Internal,
-                    format!("Can't find any location of chunk : {}", chunk),
+                    format!("Can't find any location of chunk : {chunk}"),
                 ));
             }
         }

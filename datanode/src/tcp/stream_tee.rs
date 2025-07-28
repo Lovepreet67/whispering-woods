@@ -1,10 +1,11 @@
 use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt, DuplexStream, duplex},
-    net::TcpStream,
+    io::{duplex, AsyncReadExt, AsyncWriteExt, DuplexStream,Take},
+    net::{tcp::{OwnedReadHalf, OwnedWriteHalf}},
 };
 use utilities::logger::{Instrument, Span, error, trace};
 
-pub fn tee_tcp_stream(mut tcp_stream: TcpStream) -> (DuplexStream, DuplexStream) {
+pub fn tee_tcp_stream(mut read_stream: Take<OwnedReadHalf>,mut write_stream:OwnedWriteHalf) -> (DuplexStream, DuplexStream) {
+
     let span = Span::current();
     let (mut tx1, rx1) = duplex(8192); // 8192 is 8kb
     let (mut tx2, rx2) = duplex(8192);
@@ -12,12 +13,10 @@ pub fn tee_tcp_stream(mut tcp_stream: TcpStream) -> (DuplexStream, DuplexStream)
         async move {
             let mut buf = [0u8; 8192];
             let mut x = 0;
-            let mut total_read = 0;
             loop {
                 trace!("Got {x} block of data from tcp stream");
                 x += 1;
-                let n = tcp_stream.read(&mut buf).await.unwrap_or(0);
-                total_read += n;
+                let n = read_stream.read(&mut buf).await.unwrap_or(0);
                 if n == 0 {
                                         break;
                 }
@@ -33,7 +32,9 @@ pub fn tee_tcp_stream(mut tcp_stream: TcpStream) -> (DuplexStream, DuplexStream)
             if bytes_written_to_file!=bytes_written_to_pipeline {
                 error!("Error diffrent number of bytes written to pipeline({bytes_written_to_pipeline}) and bytes written to file ({bytes_written_to_pipeline})");
             }
-            tcp_stream.write_u64(std::cmp::min(bytes_written_to_pipeline, bytes_written_to_file)).await;
+            if let Err(e) =  write_stream.write_u64(std::cmp::min(bytes_written_to_pipeline, bytes_written_to_file)).await{
+                error!("Error while writing the received bytes to client {e}")
+            }
             drop(tx1);
             drop(tx2);
         }

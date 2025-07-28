@@ -32,7 +32,7 @@ impl GrpcChannelPool {
                     endpoint
                         .connect()
                         .await
-                        .map_err(|e| format!("Error while connecting to address {:?}", e).into())
+                        .map_err(|e| format!("Error while connecting to address {e:?}").into())
                 }
                 .instrument(Span::current())
             },

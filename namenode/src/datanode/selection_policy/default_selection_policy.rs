@@ -54,6 +54,6 @@ impl DatanodeSelectionPolicy for DefaultDatanodeSelectionPolicy {
                     .clone());
             }
         }
-        return Err(format!("can't locate chunk : {}", chunk_id).into());
+        return Err(format!("can't locate chunk : {chunk_id}").into());
     }
 }

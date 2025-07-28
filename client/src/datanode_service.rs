@@ -28,6 +28,7 @@ impl DatanodeService {
     pub async fn store_chunk(
         &self,
         chunk_id: String,
+        chunk_size:u64,
         replica_set: Vec<DataNodeMeta>,
         mut read_stream: (impl AsyncRead + Unpin),
     ) -> Result<()> {
@@ -52,10 +53,11 @@ impl DatanodeService {
         tcp_stream.write_all(chunk_id.as_bytes()).await?;
         trace!("writing mode to file");
         tcp_stream.write_u8(1).await?;
+        trace!("Writing chunk size to stream");
+        tcp_stream.write_u64(chunk_size).await?;
         trace!("writing chunk to stream");
         let bytes_written = tokio::io::copy(&mut read_stream, &mut tcp_stream).await?;
         trace!("{bytes_written} Bytes written");
-        tcp_stream.shutdown().await?;
         // we will check for the number of writen bytes to stream
         let bytes_recieved_by_datanode: u64 = tcp_stream.read_u64().await?;
         if bytes_written != bytes_recieved_by_datanode {

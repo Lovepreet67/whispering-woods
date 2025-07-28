@@ -1,4 +1,3 @@
-use tokio::io::AsyncReadExt;
 use utilities::{
     logger::{Instrument, error, info, instrument, trace, tracing},
     result::Result,
@@ -28,11 +27,11 @@ impl StoreFileHandler {
         let file_metadata = match tokio::fs::metadata(local_file_path.clone()).await {
             Ok(metadata) => metadata,
             Err(e) => {
-                return Err(format!("Errror while reading file metadata : {:?}", e).into());
+                return Err(format!("Errror while reading file metadata : {e:?}").into());
             }
         };
         if file_metadata.is_dir() {
-            return Err(format!("Provided file path ({}) is dir", local_file_path).into());
+            return Err(format!("Provided file path ({local_file_path}) is dir").into());
         }
         // request namenode for chunk details
         info!("file size : {}", file_metadata.len());
@@ -58,6 +57,7 @@ impl StoreFileHandler {
                             let res = datanode
                                 .store_chunk(
                                     chunk_detail.id.clone(),
+                                    chunk_detail.end_offset-chunk_detail.start_offset,
                                     chunk_detail.location.clone(),
                                     read_stream,
                                 )

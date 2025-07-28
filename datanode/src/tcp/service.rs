@@ -7,7 +7,7 @@ use tokio::{
     sync::Mutex,
 };
 use utilities::{
-    logger::{Instrument, Level, Span, debug, error, info, span, trace},
+    logger::{Instrument, Level, Span, error, span, trace},
     result::Result,
 };
 
@@ -69,14 +69,19 @@ impl TCPService {
             let span = span!(Level::INFO,"service_tcp_write_chunk",%chunk_id);
             let _gaurd = span.enter();
             trace!(%chunk_id,"Mode set to write");
+            let chunk_size = tcp_stream.read_u64().await?;
+            trace!(%chunk_size,"Bytes to be written from the chunk");
+            let (read_stream, mut write_stream) = tcp_stream.into_split();
+            let mut limited_read_stream = read_stream.take(chunk_size);
             // read a file from the
             // after reading the chunk_id and mode  we will post that details to the pipeline
             if let Some(mut pipeline) = state.lock().await.chunk_to_pipline.remove(&chunk_id) {
                 // create tee only if you need one otherwise 2nd stream will not be consumed and
                 // program will be in lockin
-                let (mut stream1, mut stream2) = stream_tee::tee_tcp_stream(tcp_stream);
+                let (mut stream1, mut stream2) = stream_tee::tee_tcp_stream(limited_read_stream,write_stream);
                 pipeline.write_all(&chunk_id_bytes).await?;
                 pipeline.write_u8(mode).await?;
+                pipeline.write_u64(chunk_size).await?;
                 // faced issue when not running below task parrally because if we do one by one
                 // after first finish tx1 and tx2 both will be dropped which will hang state when
                 // fetching data from other stream. :)
@@ -111,12 +116,23 @@ impl TCPService {
                     .in_current_span(),
                 );
             } else {
-                match store.write(chunk_id, &mut tcp_stream).await {
+                let written_bytes = match store.write(chunk_id, &mut limited_read_stream).await {
                     Ok(bytes_written_to_file) => {
-                        tcp_stream.write_u64(bytes_written_to_file).await?;
+                        trace!("{} bytes written to file", bytes_written_to_file);
+                        bytes_written_to_file
                     }
-                    Err(_) => {
-                        tcp_stream.write_u64(0).await?;
+                    Err(e) => {
+                        error!("Error while storing the chunk");
+                        error!("{}", e);
+                        0
+                    }
+                };
+                write_stream.write_u64(written_bytes).await?;
+                match write_stream.flush().await {
+                    Ok(_) => {}
+                    Err(e) => {
+                        error!("Error while flushing the written bytes to client");
+                        error!("{}", e);
                     }
                 }
             }

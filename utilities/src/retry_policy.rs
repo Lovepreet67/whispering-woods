@@ -1,7 +1,7 @@
 use crate::result::Result;
 use std::time::Duration;
 use tokio::time::sleep;
-use tracing::{Instrument, error, info, info_span, instrument};
+use tracing::{Instrument, error, info, info_span};
 
 pub async fn retry_with_backoff<F, Fut, R>(mut f: F, max_retries: u8) -> Result<R>
 where

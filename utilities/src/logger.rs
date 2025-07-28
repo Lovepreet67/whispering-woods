@@ -8,7 +8,7 @@ use tracing_appender::{
 };
 use tracing_subscriber::{
     EnvFilter,
-    fmt::{self, format::FmtSpan},
+    fmt,
     layer::SubscriberExt,
     util::SubscriberInitExt,
 };
@@ -43,8 +43,8 @@ pub fn init_logger(
 ) -> WorkerGuard {
     let file_appender = RollingFileAppender::new(
         Rotation::NEVER,
-        format!("{log_base}/{}", service_name),
-        format!("{}.log", node_id),
+        format!("{log_base}/{service_name}"),
+        format!("{node_id}.log"),
     );
     let (non_blocking, _gaurd) = tracing_appender::non_blocking(file_appender);
     let json_layer = fmt::layer()

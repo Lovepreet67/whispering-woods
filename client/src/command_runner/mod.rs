@@ -6,7 +6,7 @@ use crate::{datanode_service::DatanodeService, namenode_service::NamenodeService
 use delete_file_handler::DeleteFileHandler;
 use fetch_file_handler::FetchFileHandler;
 use store_file_handler::StoreFileHandler;
-use utilities::{logger::instrument, logger::tracing, result::Result};
+use utilities::result::Result;
 
 pub struct CommandRunner {
     store_file_handler: StoreFileHandler,

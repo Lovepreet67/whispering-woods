@@ -32,12 +32,7 @@ impl NamenodeService {
             .connection
             .store_file(tonic_request)
             .await
-            .map_err(|e| {
-                format!(
-                    "error while storing a file {} to the namenode {:?}",
-                    file_name, e
-                )
-            })?
+            .map_err(|e| format!("error while storing a file {file_name} to the namenode {e:?}",))?
             .into_inner();
         Ok(store_file_response.chunk_list.clone())
     }
@@ -53,8 +48,7 @@ impl NamenodeService {
             .await
             .map_err(|e| {
                 format!(
-                    "error while fetching a file {} from the namenode {:?}",
-                    file_name, e
+                    "error while fetching a file {file_name} from the namenode {e:?}",
                 )
             })?
             .into_inner();
@@ -72,10 +66,7 @@ impl NamenodeService {
             .delete_file(tonic_request)
             .await
             .map_err(|e| {
-                format!(
-                    "error while fetching a file {} from the namenode {:?}",
-                    file_name, e
-                )
+                format!("error while fetching a file {file_name} from the namenode {e:?}")
             })?
             .into_inner();
         Ok(delete_file_response.file_present)
