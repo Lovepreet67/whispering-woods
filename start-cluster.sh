@@ -32,10 +32,10 @@ sleep 3
 # -----------------------
 # DMG_DIR="$(pwd)/disks/"
 # MOUNT_BASE="/Volumes"
-# DATANODE_COUNT=${1:-3}
+DATANODE_COUNT=${1:-3}
 # DISK_SIZE="1g"
 
-mkdir -p "$DMG_DIR"
+# mkdir -p "$DMG_DIR"
 
 echo "Starting $DATANODE_COUNT DataNodes..."
 for ((i = 0; i < DATANODE_COUNT; i++)); do
@@ -47,7 +47,6 @@ for ((i = 0; i < DATANODE_COUNT; i++)); do
   #
   # echo "Mounting $dmg_path to $mount_point .."
   # hdiutil attach "$dmg_path" -mountpoint "$mount_point"
-
   grpc_port=$((3000 + i*10))
   tcp_port=$((3001 + i*10))
 

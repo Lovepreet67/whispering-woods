@@ -1,5 +1,5 @@
 use super::selection_policy::DatanodeSelectionPolicy;
-use crate::namenode_state::NamenodeState;
+use crate::namenode_state::{self, NamenodeState};
 use proto::generated::client_namenode::DataNodeMeta;
 use std::{error::Error, sync::Arc};
 use tokio::sync::Mutex;
@@ -42,16 +42,13 @@ impl DatanodeSelectionPolicy for DefaultDatanodeSelectionPolicy {
         let namenode_state = self.namenode_state.lock().await;
         if let Some(location) = namenode_state.chunk_to_location_map.get(chunk_id) {
             // return the first datanode
-            if !location.is_empty()
-                && namenode_state
-                    .datanode_to_meta_map
-                    .contains_key(&location[0])
-            {
-                return Ok(namenode_state
-                    .datanode_to_meta_map
-                    .get(&location[0])
-                    .expect("Error while fetching datanode map")
-                    .clone());
+            if let Some(datanode) = namenode_state.datanode_to_meta_map.get(
+                location
+                    .iter()
+                    .find(|&datanode_id| namenode_state.active_datanodes.contains(datanode_id))
+                    .expect("No active datanodes for chunk"),
+            ) {
+                return Ok(datanode.clone());
             }
         }
         return Err(format!("can't locate chunk : {chunk_id}").into());

@@ -47,9 +47,7 @@ impl NamenodeService {
             .fetch_file(tonic_request)
             .await
             .map_err(|e| {
-                format!(
-                    "error while fetching a file {file_name} from the namenode {e:?}",
-                )
+                format!("error while fetching a file {file_name} from the namenode {e:?}",)
             })?
             .into_inner();
         Ok(fetch_file_response)
