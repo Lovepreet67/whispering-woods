@@ -2,8 +2,6 @@
 
 set -euo pipefail
 
-DOCKER_COMPOSE_FILE="./logger/docker-compose.yaml"
-
 # Stop Rust processes by their binary names
 echo "Stopping Rust services..."
 
@@ -16,5 +14,5 @@ else
 fi
 
 # Stop docker-compose services
-echo "Stopping docker-compose services..."
-docker compose -f "$DOCKER_COMPOSE_FILE" down
+echo "Stoping and removing filebeat container"
+docker rm -f filebeat >/dev/null 2>&1 || true

@@ -7,7 +7,7 @@ filebeat.inputs:
     json.add_error_key: true
 output.elasticsearch:
   hosts: ["${ES_HOST:http://host.docker.internal:9200}"]
-  username: "elastic"
-  password: "password"  # Leave blank if xpack security is disabled
+  username: "${ELASTIC_USERNAME:elastic}"
+  password: "${ELASTIC_PASSWORD:password}"  # Leave blank if xpack security is disabled
 
 setup.ilm.enabled: false

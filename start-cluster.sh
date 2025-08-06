@@ -8,8 +8,28 @@ export ENV="container"
 
 # Here we are mapping host.docker.internal to resolve to local host on local machine 
 # so that we can use same address inside container and host machine
+# For mac os and linux
 grep -Fxq "127.0.0.1 host.docker.internal" /etc/hosts || echo "127.0.0.1 host.docker.internal" | sudo tee -a /etc/hosts
 
+# For windows system will wsl (must run as administrator)
+# grep -Fxq "127.0.0.1 host.docker.internal" /mnt/c/Windows/System32/drivers/etc/hosts \
+#   || echo "127.0.0.1 host.docker.internal" | tee -a /mnt/c/Windows/System32/drivers/etc/hosts
+
+# For gitbash/minGW (must run as administrator)
+#grep -Fxq "127.0.0.1 host.docker.internal" /c/Windows/System32/drivers/etc/hosts \
+#  || echo "127.0.0.1 host.docker.internal" | tee -a /c/Windows/System32/drivers/etc/hosts
+
+
+#change this log volume mapping if you are using other location for logs in default config.yaml logs path it ./temp**
+echo "starting the filebeat container"
+docker run -d \
+  --name=filebeat \
+  --user=root \
+  --volume="$(pwd)/logger/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro" \
+  --volume="./temp/:/logs/:ro" \
+  docker.elastic.co/beats/filebeat:8.17.7 \
+  filebeat
+echo "filebeat container is running now"
 # -----------------------
 # Start the namenode
 # -----------------------

@@ -16,7 +16,6 @@ until curl -s -u "$ELASTIC_USER:$ELASTIC_PASS" "$ELASTIC_HOST" | grep -q "cluste
   sleep 5
 done
 
-echo ""
 echo "Elasticsearch is up. Resetting passwords..."
 
 # Reset passwords

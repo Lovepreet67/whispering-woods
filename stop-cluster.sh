@@ -17,6 +17,9 @@ else
   done
 fi
 
+echo "Stoping and removing filebeat container"
+docker rm -f filebeat >/dev/null 2>&1 || true
+
 echo "Cluster stopped and containers removed."
 # for checking available stoage
 # sleep 5 
