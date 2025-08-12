@@ -21,19 +21,16 @@ impl StateMantainer {
                 ticker.tick().await;
                 let span = span!(Level::INFO, "namenode_state_sync");
                 let _entered = span.enter();
-
                 let mut state = self.namenode_state.lock().await;
-                // do the state mantaining task
-                let heartbeat_details = state.datanode_to_heart_beat_time.clone();
-                // now based on these heartbeat details we will remove the nodes from active
-                for (datanode_id, timestamp) in heartbeat_details.into_iter() {
-                    // check if timestamp is older than 5 secs and remove datanode from active nodes
-                    if timestamp.elapsed() > Duration::from_secs(5) {
-                        state.active_datanodes.remove(&datanode_id);
-                    } else {
-                        state.active_datanodes.insert(datanode_id);
+                // remaving all the chunks which are deleted and last seen 23 or more seconds ago
+                // i.e two statesync intervals
+                state.chunk_id_to_detail_map.retain(
+                    |_,value|{
+                    if let crate::namenode_state::chunk_details::ChunkState::Deleted(last_seen)  = value.state{
+                        return last_seen.elapsed() < Duration::from_secs(23);
                     }
-                }
+                    return true;
+                });
             }
         });
     }

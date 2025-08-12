@@ -23,7 +23,7 @@ message StateSyncRequest{
   repeated string available_chunks=3;
 }
 message StateSyncResponse{
-
+  repeated string chunks_to_be_deleted=1;
 }
 message HeartBeatRequest {
   string datanode_id =1;
