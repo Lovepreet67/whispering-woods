@@ -11,9 +11,7 @@ use tokio::{
 use tonic::async_trait;
 use utilities::logger::{debug, error, instrument, tracing};
 
-use crate::{
-    namenode_state::{NamenodeState, chunk_details::ChunkDetails},
-};
+use crate::namenode_state::{NamenodeState, chunk_details::ChunkDetails};
 
 use super::{recorder::Recorder, replayer::Replayer};
 pub trait Ledger: Replayer + Recorder {}
@@ -130,7 +128,9 @@ impl Replayer for DefaultLedger {
                         }
                         let chunk_details =
                             ChunkDetails::new(chunk_id.clone(), start_offset, end_offset);
-                        state.chunk_id_to_detail_map.insert(chunk_id.clone(), chunk_details);
+                        state
+                            .chunk_id_to_detail_map
+                            .insert(chunk_id.clone(), chunk_details);
                         let chunks = state
                             .file_to_chunk_map
                             .get_mut(filename)

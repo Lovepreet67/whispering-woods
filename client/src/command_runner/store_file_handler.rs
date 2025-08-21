@@ -57,7 +57,7 @@ impl StoreFileHandler {
                             let res = datanode
                                 .store_chunk(
                                     chunk_detail.id.clone(),
-                                    chunk_detail.end_offset-chunk_detail.start_offset,
+                                    chunk_detail.end_offset - chunk_detail.start_offset,
                                     chunk_detail.location.clone(),
                                     read_stream,
                                 )

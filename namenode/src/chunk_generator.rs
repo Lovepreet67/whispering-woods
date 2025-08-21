@@ -2,7 +2,7 @@ use std::cmp::min;
 
 use utilities::logger::{instrument, tracing};
 
-use crate::{namenode_state::chunk_details::ChunkDetails};
+use crate::namenode_state::chunk_details::ChunkDetails;
 
 pub trait ChunkGenerator {
     fn get_chunks(&self, file_size: u64, file_name: &str) -> Vec<ChunkDetails>;

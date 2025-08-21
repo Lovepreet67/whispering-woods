@@ -10,11 +10,9 @@ use utilities::logger::{instrument, trace, tracing};
 
 use crate::{
     chunk_generator::{ChunkGenerator, DefaultChunkGenerator},
-    datanode::{
-        selection_policy::{
-            default_selection_policy::DefaultDatanodeSelectionPolicy,
-            selection_policy::DatanodeSelectionPolicy,
-        },
+    datanode::selection_policy::{
+        default_selection_policy::DefaultDatanodeSelectionPolicy,
+        selection_policy::DatanodeSelectionPolicy,
     },
     ledger::default_ledger::Ledger,
     namenode_state::NamenodeState,

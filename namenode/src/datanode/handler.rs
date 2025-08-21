@@ -4,7 +4,7 @@ use tokio::sync::Mutex;
 use utilities::logger::{instrument, tracing};
 
 use crate::namenode_state::NamenodeState;
-use crate::namenode_state::{datanode_details::DatanodeDetail};
+use crate::namenode_state::datanode_details::DatanodeDetail;
 
 use proto::generated::datanode_namenode::{
     ConnectionRequest, ConnectionResponse, HeartBeatRequest, HeartBeatResponse, StateSyncRequest,
@@ -70,7 +70,11 @@ impl DatanodeNamenode for DatanodeHandler {
         } else {
             state.datanode_to_detail_map.insert(
                 connection_request.id.clone(),
-                DatanodeDetail::new(connection_request.id,connection_request.name, connection_request.addrs),
+                DatanodeDetail::new(
+                    connection_request.id,
+                    connection_request.name,
+                    connection_request.addrs,
+                ),
             );
             ConnectionResponse {
                 connected: true,
@@ -87,12 +91,13 @@ impl DatanodeNamenode for DatanodeHandler {
     ) -> Result<tonic::Response<StateSyncResponse>, tonic::Status> {
         let state_sync_request = request.into_inner();
         let mut state = self.state.lock().await;
-        if let Some(datanode_details) = state.datanode_to_detail_map.get_mut(&state_sync_request.id){
+        if let Some(datanode_details) = state.datanode_to_detail_map.get_mut(&state_sync_request.id)
+        {
             datanode_details.sync_state(state_sync_request.availabe_storage);
         }
         let mut chunks_to_be_deleted = vec![];
         for chunk_id in state_sync_request.available_chunks {
-            if let Some(chunk_details) = state.chunk_id_to_detail_map.get_mut(&chunk_id){
+            if let Some(chunk_details) = state.chunk_id_to_detail_map.get_mut(&chunk_id) {
                 if chunk_details.is_deleted() {
                     chunks_to_be_deleted.push(chunk_id);
                     continue;
@@ -102,7 +107,7 @@ impl DatanodeNamenode for DatanodeHandler {
             chunks_to_be_deleted.push(chunk_id);
         }
         let response = StateSyncResponse {
-            chunks_to_be_deleted 
+            chunks_to_be_deleted,
         };
         Ok(tonic::Response::new(response))
     }

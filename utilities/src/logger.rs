@@ -6,12 +6,7 @@ use tracing_appender::{
     non_blocking::WorkerGuard,
     rolling::{RollingFileAppender, Rotation},
 };
-use tracing_subscriber::{
-    EnvFilter,
-    fmt,
-    layer::SubscriberExt,
-    util::SubscriberInitExt,
-};
+use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 // exporing the info! warn! etc tracing macro through this Library
 pub use tracing;
 pub use tracing::*;
