@@ -266,6 +266,7 @@ name = "datanode"
 version = "0.1.0"
 dependencies = [
  "figment",
+ "futures",
  "once_cell",
  "proto",
  "serde",

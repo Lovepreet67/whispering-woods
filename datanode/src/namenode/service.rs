@@ -44,7 +44,7 @@ impl NamenodeService {
             }
             Err(tonic_status) => {
                 error!(error = ?tonic_status,"Error while connecting to namenode");
-                Err(format!("Error while connecting to namenode {}", tonic_status).into())
+                Err(format!("Error while connecting to namenode {tonic_status}").into())
             }
         }
     }
@@ -62,18 +62,32 @@ impl NamenodeService {
     }
     #[instrument(name = "service_namenode_state_sync", skip(self))]
     pub async fn state_sync(&self) -> Result<()> {
-        let state = self.state.lock().await;
+        let mut state = self.state.lock().await;
         trace!(?state, "sending state sync with");
         let state_sync_request = StateSyncRequest {
             id: CONFIG.datanode_id.clone(),
             available_chunks: state.available_chunks.clone(),
             availabe_storage: state.available_storage as u64,
         };
-        drop(state);
         let mut namenode_client = self.get_grpc_connection(&CONFIG.namenode_addrs).await?;
-        namenode_client
+        let state_sync_response = match namenode_client
             .state_sync(tonic::Request::new(state_sync_request))
-            .await?;
+            .await
+        {
+            Ok(response) => response,
+            Err(e) => {
+                error!("Error while sending the state sync message to namenode, {e}");
+                return Err(e.into());
+            }
+        };
+
+        state_sync_response
+            .into_inner()
+            .chunks_to_be_deleted
+            .into_iter()
+            .for_each(|chunk| {
+                state.to_be_deleted_chunks.insert(chunk);
+            });
         Ok(())
     }
 }
