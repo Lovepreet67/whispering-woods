@@ -57,4 +57,70 @@ impl DatanodeSelectionPolicy for DefaultDatanodeSelectionPolicy {
             ));
         return Ok(candidate.into());
     }
+    async fn get_datanodes_to_repair(
+        &self,
+        chunk_id: &str,
+    ) -> Result<(DataNodeMeta, DataNodeMeta), Box<dyn Error>> {
+        let state = self.namenode_state.lock().await;
+        // fair assumption that chunk meta is present
+        let chunk_details = state.chunk_id_to_detail_map.get(chunk_id).unwrap();
+        let locations = chunk_details.get_locations();
+        let chunk_size = chunk_details.end_offset - chunk_details.start_offset;
+        let target_datanode =
+            match state
+                .datanode_to_detail_map
+                .iter()
+                .find_map(|(datanode_id, datanode_details)| {
+                    if datanode_details.can_store(chunk_size) && !locations.contains(datanode_id)
+                    // locations size will be less than
+                    // default replica count
+                    {
+                        return Some(datanode_details);
+                    }
+                    None
+                }) {
+                Some(target) => target,
+                None => return Err("Datanode with sufficent storage is not available".into()),
+            };
+        Ok((
+            state
+                .datanode_to_detail_map
+                .get(&locations[0])
+                .unwrap()
+                .into(),
+            target_datanode.into(),
+        ))
+    }
+    // choose node with lowest available storage among candidates
+    async fn get_datanode_to_offload(
+        &self,
+        chunk_id: &str,
+        count: usize,
+    ) -> Result<Vec<DataNodeMeta>, Box<dyn Error>> {
+        let state = self.namenode_state.lock().await;
+        // it is a fair assumption that there are more than 3 locations for overreplicated chunk
+        let mut locations = state
+            .chunk_id_to_detail_map
+            .get(chunk_id)
+            .unwrap()
+            .get_locations();
+        locations.sort_by(|a, b| {
+            let available_storage_a = state
+                .datanode_to_detail_map
+                .get(a)
+                .unwrap()
+                .storage_remaining;
+            let available_storage_b = state
+                .datanode_to_detail_map
+                .get(b)
+                .unwrap()
+                .storage_remaining;
+            available_storage_b.cmp(&available_storage_a)
+        });
+        Ok(locations
+            .iter()
+            .take(count)
+            .map(|location| state.datanode_to_detail_map.get(location).unwrap().into())
+            .collect())
+    }
 }

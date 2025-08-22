@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
 use tokio::sync::Mutex;
 use utilities::logger::{instrument, tracing};
@@ -96,16 +96,26 @@ impl DatanodeNamenode for DatanodeHandler {
             datanode_details.sync_state(state_sync_request.availabe_storage);
         }
         let mut chunks_to_be_deleted = vec![];
-        for chunk_id in state_sync_request.available_chunks {
-            if let Some(chunk_details) = state.chunk_id_to_detail_map.get_mut(&chunk_id) {
+        for chunk_id in &state_sync_request.available_chunks {
+            if let Some(chunk_details) = state.chunk_id_to_detail_map.get_mut(chunk_id) {
                 if chunk_details.is_deleted() {
-                    chunks_to_be_deleted.push(chunk_id);
+                    chunks_to_be_deleted.push(chunk_id.to_owned());
                     continue;
                 }
                 chunk_details.add_location(&state_sync_request.id);
+            } else {
+                chunks_to_be_deleted.push(chunk_id.to_owned());
             }
-            chunks_to_be_deleted.push(chunk_id);
         }
+        state
+            .chunk_id_to_detail_map
+            .iter_mut()
+            .filter(|(_, chunk_meta)| chunk_meta.locations.contains(&state_sync_request.id))
+            .for_each(|(chunk_id, chunk_meta)| {
+                if !state_sync_request.available_chunks.contains(chunk_id) {
+                    chunk_meta.remove_location(&state_sync_request.id);
+                }
+            });
         let response = StateSyncResponse {
             chunks_to_be_deleted,
         };

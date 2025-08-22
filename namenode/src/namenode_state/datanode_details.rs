@@ -43,7 +43,7 @@ impl DatanodeDetail {
         true
     }
     pub fn can_store(&self, chunk_size: u64) -> bool {
-        self.storage_remaining > chunk_size
+        self.is_active() && self.storage_remaining > chunk_size
     }
 }
 

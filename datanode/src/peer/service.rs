@@ -1,6 +1,8 @@
 use proto::generated::{
     client_namenode::DataNodeMeta,
-    datanode_datanode::{CommitChunkRequest, CreatePipelineRequest, peer_client::PeerClient},
+    datanode_datanode::{
+        CommitChunkRequest, CreatePipelineRequest, StoreChunkRequest, peer_client::PeerClient,
+    },
 };
 use tonic::transport::Channel;
 use utilities::{
@@ -10,6 +12,7 @@ use utilities::{
     retry_policy::retry_with_backoff,
 };
 
+#[derive(Default)]
 pub struct PeerService {}
 
 impl PeerService {
@@ -53,6 +56,28 @@ impl PeerService {
         .await?;
         let create_pipelince_response = response.get_ref();
         Ok(create_pipelince_response.address.to_owned())
+    }
+    #[instrument(name = "service_peer_store_chunk", skip(self))]
+    pub async fn store_chunk(&self, chunk_id: &str, addrs: &str) -> Result<String> {
+        let response = retry_with_backoff(
+            || async {
+                let store_chunk_request = StoreChunkRequest {
+                    chunk_id: chunk_id.to_owned(),
+                };
+                let mut client = self.get_grpc_connection(addrs).await?;
+                let request = tonic::Request::new(store_chunk_request);
+                client.store_chunk(request).await.map_err(|e| {
+                    format!(
+                        "Error while sending store chunk request to {addrs}, for chunk {chunk_id}, {e:?}"
+                    )
+                    .into()
+                })
+            },
+            3,
+        )
+        .await?;
+        let store_chunk_response = response.into_inner();
+        Ok(store_chunk_response.address)
     }
     #[instrument(name = "service_peer_commit_chunk", skip(self))]
     pub async fn commit_chunk(&self, chunk_id: &str, addrs: &str) -> Result<bool> {

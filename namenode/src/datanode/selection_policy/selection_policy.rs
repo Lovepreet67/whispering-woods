@@ -9,4 +9,13 @@ pub trait DatanodeSelectionPolicy {
         chunk_size: u64,
     ) -> Result<Vec<DataNodeMeta>, Box<dyn Error>>;
     async fn get_datanodes_to_serve(&self, chunk_id: &str) -> Result<DataNodeMeta, Box<dyn Error>>;
+    async fn get_datanodes_to_repair(
+        &self,
+        chunk_id: &str,
+    ) -> Result<(DataNodeMeta, DataNodeMeta), Box<dyn Error>>;
+    async fn get_datanode_to_offload(
+        &self,
+        chunk_id: &str,
+        count: usize,
+    ) -> Result<Vec<DataNodeMeta>, Box<dyn Error>>;
 }
