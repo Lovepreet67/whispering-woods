@@ -38,10 +38,7 @@ impl NamenodeService {
             .connection(tonic::Request::new(connection_request))
             .await
         {
-            Ok(connected) => {
-                info!("Connected to namenode sucessfully");
-                Ok(connected.into_inner().connected)
-            }
+            Ok(connected) => Ok(connected.into_inner().connected),
             Err(tonic_status) => {
                 error!(error = ?tonic_status,"Error while connecting to namenode");
                 Err(format!("Error while connecting to namenode {tonic_status}").into())

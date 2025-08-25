@@ -4,7 +4,6 @@ mod config;
 mod datanode;
 mod ledger;
 mod namenode_state;
-
 use client_handler::ClientHandler;
 use config::CONFIG;
 use datanode::handler::DatanodeHandler;

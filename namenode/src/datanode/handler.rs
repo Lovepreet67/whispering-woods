@@ -1,4 +1,4 @@
-use std::{collections::HashSet, sync::Arc};
+use std::sync::Arc;
 
 use tokio::sync::Mutex;
 use utilities::logger::{instrument, tracing};
@@ -58,14 +58,21 @@ impl DatanodeNamenode for DatanodeHandler {
             connection_request.id
         );*/
         let mut state = self.state.lock().await;
-        // if the connection already exist for this we will not accept connection
-        let response = if state
-            .datanode_to_detail_map
-            .contains_key(&connection_request.id)
+        // if the connection already exist we will accept the connection and mark node as active
+        let response = if let Some(datanode_details) =
+            state.datanode_to_detail_map.get_mut(&connection_request.id)
         {
-            ConnectionResponse {
-                connected: false,
-                msg: "Connection already exist for the specified id".to_owned(),
+            if datanode_details.is_active() {
+                ConnectionResponse {
+                    connected: false,
+                    msg: "Connection already exist for the specified id".to_owned(),
+                }
+            } else {
+                datanode_details.mark_heartbeat();
+                ConnectionResponse {
+                    connected: true,
+                    msg: "Connection restablished".to_owned(),
+                }
             }
         } else {
             state.datanode_to_detail_map.insert(
