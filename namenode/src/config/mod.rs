@@ -13,6 +13,7 @@ pub struct Config {
     pub ledger_file: String,
     pub log_level: String,
     pub log_base: String,
+    pub state_log_file: Option<String>,
     pub apm_endpoint: String,
 }
 pub static CONFIG: Lazy<Config> = Lazy::new(|| {

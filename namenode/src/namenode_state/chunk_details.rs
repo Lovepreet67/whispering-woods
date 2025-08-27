@@ -1,13 +1,14 @@
+use serde::Serialize;
 use std::{collections::HashSet, time::Instant};
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, Serialize)]
 pub enum ChunkState {
     #[default]
     Initialized,
     Commited,
-    Deleted(Instant),
+    Deleted(#[serde(skip_serializing)] Instant),
 }
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, Serialize)]
 pub struct ChunkDetails {
     pub id: String,
     pub locations: HashSet<String>,

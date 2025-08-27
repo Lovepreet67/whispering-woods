@@ -14,9 +14,9 @@ use proto::generated::client_datanode::client_data_node_server::ClientDataNodeSe
 use proto::generated::datanode_datanode::peer_server::PeerServer;
 use proto::generated::namenode_datanode::namenode_datanode_server::NamenodeDatanodeServer;
 use state_mantainer::StateMantainer;
+use std::error::Error;
 use std::sync::Arc;
 use std::time::Duration;
-use std::{error::Error, process};
 use storage::file_storage;
 use tokio::sync::Mutex;
 use tokio::time::sleep;

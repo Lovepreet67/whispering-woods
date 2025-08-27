@@ -5,6 +5,7 @@ filebeat.inputs:
       - /logs/**/*.log
     json.keys_under_root: true
     json.add_error_key: true
+    index: "gfs-app-logs"
 output.elasticsearch:
   hosts: ["http://host.docker.internal:9200"]
   username: "${ELASTIC_USERNAME:elastic}"

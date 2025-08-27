@@ -47,7 +47,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     };
     let state = Arc::new(Mutex::new(state_history));
-    let state_mantainer = StateMantainer::new(state.clone());
+    let state_mantainer = StateMantainer::new(state.clone()).await;
     state_mantainer.start();
     // first we will start grpc server
     Server::builder()

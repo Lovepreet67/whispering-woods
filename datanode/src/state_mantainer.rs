@@ -3,7 +3,7 @@ use std::{sync::Arc, time::Duration};
 use futures::future::join_all;
 use storage::{file_storage::FileStorage, storage::Storage};
 use tokio::{sync::Mutex, time::interval};
-use utilities::logger::{error, span, trace, Level};
+use utilities::logger::{Level, error, span, trace};
 
 use crate::datanode_state::DatanodeState;
 
@@ -42,15 +42,16 @@ impl StateMantainer {
                 };
                 let mut state = self.state.lock().await;
                 let to_be_deleted = std::mem::take(&mut state.to_be_deleted_chunks);
-                state.available_chunks = available_chunks.into_iter()
+                state.available_chunks = available_chunks
+                    .into_iter()
                     .filter(|chunk| !to_be_deleted.contains(chunk))
                     .collect();
                 state.available_storage = available_storage;
                 drop(state);
                 trace!("Deleting chunks {to_be_deleted:?}");
-                let delete_promise = to_be_deleted.into_iter().map( |chunk| 
-                    self.store.delete(chunk)
-                );
+                let delete_promise = to_be_deleted
+                    .into_iter()
+                    .map(|chunk| self.store.delete(chunk));
                 join_all(delete_promise).await;
             }
         });

@@ -1,6 +1,7 @@
 pub mod chunk_details;
 pub mod datanode_details;
 pub mod state_mantainer;
+pub mod state_snapshot;
 
 use std::collections::HashMap;
 

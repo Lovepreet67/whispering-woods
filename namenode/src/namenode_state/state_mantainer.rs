@@ -3,29 +3,47 @@ use std::{sync::Arc, time::Duration};
 
 use futures::future::join_all;
 use tokio::{sync::Mutex, time::interval};
-use utilities::logger::{Level, error, span};
+use utilities::logger::{Level, debug, error, span};
 
+use crate::config::CONFIG;
 use crate::datanode::selection_policy::default_selection_policy::DefaultDatanodeSelectionPolicy;
 use crate::datanode::selection_policy::selection_policy::DatanodeSelectionPolicy;
 use crate::datanode::service::DatanodeService;
 use crate::namenode_state::NamenodeState;
 use crate::namenode_state::chunk_details::ChunkReplicationStatus;
+use crate::namenode_state::state_snapshot::NamenodeStateSnapshot;
+use std::path;
+use utilities::state_logger;
 
 /// To mantain the state of the namenode based on the heartbeat
 pub struct StateMantainer {
+    snapshot_sender: tokio::sync::mpsc::Sender<NamenodeState>,
     datanode_service: DatanodeService,
     datanode_selection_policy: Arc<Mutex<Box<dyn DatanodeSelectionPolicy + Send + Sync>>>,
     namenode_state: Arc<Mutex<NamenodeState>>,
 }
 
 impl StateMantainer {
-    pub fn new(namenode_state: Arc<Mutex<NamenodeState>>) -> Self {
+    pub async fn new(namenode_state: Arc<Mutex<NamenodeState>>) -> Self {
+        let tx = state_logger::StateLogger::<NamenodeStateSnapshot, _>::start(
+            NamenodeState::default(),
+            path::Path::new(
+                &CONFIG
+                    .state_log_file
+                    .clone()
+                    .unwrap_or_else(|| "/app/state.log".to_owned()),
+            ),
+        )
+        .await
+        .map_err(|e| format!("Error while creating a state logger {e}"))
+        .unwrap();
         Self {
             datanode_service: DatanodeService::default(),
             datanode_selection_policy: Arc::new(Mutex::new(Box::new(
                 DefaultDatanodeSelectionPolicy::new(namenode_state.clone()),
             ))),
             namenode_state,
+            snapshot_sender: tx,
         }
     }
     // this function is fire and forget
@@ -131,6 +149,13 @@ impl StateMantainer {
                             ChunkReplicationStatus::Balanced => {}
                         }
                     });
+                debug!("Sending state to state logger");
+                match self.snapshot_sender.send(state.clone()).await {
+                    Ok(_) => {}
+                    Err(e) => {
+                        error!("Error while sending state snapshot to logger {e}");
+                    }
+                }
             }
         });
     }

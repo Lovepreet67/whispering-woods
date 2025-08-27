@@ -47,12 +47,12 @@ impl DatanodeDetail {
     }
 }
 
-impl Into<DataNodeMeta> for &DatanodeDetail {
-    fn into(self) -> DataNodeMeta {
+impl From<&DatanodeDetail> for DataNodeMeta {
+    fn from(value: &DatanodeDetail) -> Self {
         DataNodeMeta {
-            id: self.id.clone(),
-            name: self.name.clone(),
-            addrs: self.addrs.clone(),
+            id: value.id.clone(),
+            name: value.name.clone(),
+            addrs: value.addrs.clone(),
         }
     }
 }
