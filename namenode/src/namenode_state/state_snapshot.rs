@@ -2,7 +2,7 @@ use crate::namenode_state::{NamenodeState, chunk_details, datanode_details::Data
 use serde::Serialize;
 use std::{collections::HashMap, hash::Hash, time::SystemTime};
 
-#[derive(Clone, Debug, Hash, Serialize)]
+#[derive(Clone, Debug, Hash, PartialEq, Serialize)]
 pub struct DatanodeStateSnapshot {
     pub is_active: bool,
     pub storage_remaining: u64,
@@ -39,5 +39,13 @@ impl From<NamenodeState> for NamenodeStateSnapshot {
             file_to_chunk_map: value.file_to_chunk_map,
             chunk_id_to_detail_map: value.chunk_id_to_detail_map,
         }
+    }
+}
+
+impl PartialEq for NamenodeStateSnapshot {
+    fn eq(&self, other: &Self) -> bool {
+        self.chunk_id_to_detail_map == other.chunk_id_to_detail_map
+            && self.datanode_to_detail_map == other.datanode_to_detail_map
+            && self.file_to_chunk_map == other.file_to_chunk_map
     }
 }

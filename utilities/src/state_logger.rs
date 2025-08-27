@@ -7,7 +7,7 @@ use tracing::{info, trace};
 
 pub struct StateLogger<T, U>
 where
-    T: Serialize + Send + Sync + 'static,
+    T: PartialEq + Serialize + Send + Sync + 'static,
     U: Into<T> + Send + Sync + 'static,
 {
     current_state: T,
@@ -16,7 +16,7 @@ where
 }
 impl<T, U> StateLogger<T, U>
 where
-    T: Serialize + Send + Sync + 'static,
+    T: PartialEq + Serialize + Send + Sync + 'static,
     U: Into<T> + Send + Sync + 'static,
 {
     pub async fn start(state: U, target_file_path: &Path) -> Result<tokio::sync::mpsc::Sender<U>> {
@@ -35,12 +35,14 @@ where
             while let Some(new_state) = state_logger.receiver.recv().await {
                 let state = new_state.into();
                 trace!("Checking if the state snapshot is same or not");
-                match state_logger.update_state(state).await {
-                    Ok(_) => {
-                        info!("snapshot written successfully")
-                    }
-                    Err(e) => {
-                        error!("Error while sending the updated state to es, {e}");
+                if state != state_logger.current_state {
+                    match state_logger.update_state(state).await {
+                        Ok(_) => {
+                            trace!("snapshot written successfully")
+                        }
+                        Err(e) => {
+                            error!("Error while sending the updated state to es, {e}");
+                        }
                     }
                 }
             }
