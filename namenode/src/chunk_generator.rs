@@ -2,10 +2,10 @@ use std::cmp::min;
 
 use utilities::logger::{instrument, tracing};
 
-use crate::data_structure::ChunkBounderies;
+use crate::namenode_state::chunk_details::ChunkDetails;
 
 pub trait ChunkGenerator {
-    fn get_chunks(&self, file_size: u64, file_name: &str) -> Vec<ChunkBounderies>;
+    fn get_chunks(&self, file_size: u64, file_name: &str) -> Vec<ChunkDetails>;
 }
 
 pub struct DefaultChunkGenerator {
@@ -20,15 +20,15 @@ impl DefaultChunkGenerator {
 
 impl ChunkGenerator for DefaultChunkGenerator {
     #[instrument(name = "namenode_get_chunks", skip(self))]
-    fn get_chunks(&self, file_size: u64, _file_name: &str) -> Vec<ChunkBounderies> {
+    fn get_chunks(&self, file_size: u64, _file_name: &str) -> Vec<ChunkDetails> {
         let mut curr_offset: u64 = 0;
-        let mut chunks: Vec<ChunkBounderies> = vec![];
+        let mut chunks: Vec<ChunkDetails> = vec![];
         while curr_offset < file_size {
-            chunks.push(ChunkBounderies {
-                chunk_id: uuid::Uuid::new_v4().to_string(),
-                start_offset: curr_offset,
-                end_offset: min(curr_offset + self.max_chunk_size, file_size),
-            });
+            chunks.push(ChunkDetails::new(
+                uuid::Uuid::new_v4().to_string(),
+                curr_offset,
+                min(curr_offset + self.max_chunk_size, file_size),
+            ));
             curr_offset += self.max_chunk_size;
         }
         chunks

@@ -11,7 +11,7 @@ use tokio::{
 use tonic::async_trait;
 use utilities::logger::{debug, error, instrument, tracing};
 
-use crate::{data_structure::ChunkBounderies, namenode_state::NamenodeState};
+use crate::namenode_state::{NamenodeState, chunk_details::ChunkDetails};
 
 use super::{recorder::Recorder, replayer::Replayer};
 pub trait Ledger: Replayer + Recorder {}
@@ -110,35 +110,32 @@ impl Replayer for DefaultLedger {
                 match operation {
                     "store_file" => {
                         // it will be structred as item = file_name,number_of_chunks
-                        let file_details: Vec<&str> = item.split(',').collect();
-                        let filename = file_details[0].to_owned();
+                        let tokens: Vec<&str> = item.split(',').collect();
+                        let filename = tokens[0].to_owned();
                         state.file_to_chunk_map.insert(filename, vec![]);
                     }
                     "store_chunk" => {
                         // it will be of structure filename,order,chunk_id,start_offset,end_offset
-                        let chunk_details: Vec<&str> = item.split(',').collect();
-                        let filename = chunk_details[0];
-                        let chunk_id = chunk_details[2].to_owned();
-                        let start_offset: u64 = chunk_details[3]
-                            .parse()
-                            .expect("Invalid start offset value");
-                        let end_offset: u64 =
-                            chunk_details[4].parse().expect("Invalid end offset value");
+                        let tokens: Vec<&str> = item.split(',').collect();
+                        let filename = tokens[0];
+                        let chunk_id = tokens[2].to_owned();
+                        let start_offset: u64 =
+                            tokens[3].parse().expect("Invalid start offset value");
+                        let end_offset: u64 = tokens[4].parse().expect("Invalid end offset value");
 
-                        if chunk_details.len() < 5 {
+                        if tokens.len() < 5 {
                             error!(%log,"Invalid store_chunk log format");
                         }
-                        let chunk_boundry = ChunkBounderies {
-                            chunk_id: chunk_id.clone(),
-                            start_offset,
-                            end_offset,
-                        };
+                        let chunk_details =
+                            ChunkDetails::new(chunk_id.clone(), start_offset, end_offset);
+                        state
+                            .chunk_id_to_detail_map
+                            .insert(chunk_id.clone(), chunk_details);
                         let chunks = state
                             .file_to_chunk_map
                             .get_mut(filename)
                             .expect("Got chunk details before file store");
                         chunks.push(chunk_id.clone());
-                        state.chunk_to_boundry_map.insert(chunk_id, chunk_boundry);
                     }
                     "delete_file" => {
                         // it will only contain file_name
@@ -146,9 +143,12 @@ impl Replayer for DefaultLedger {
                     }
                     "delete_chunk" => {
                         // it will only contain file_name,chunk_id
-                        let chunk_details: Vec<&str> = item.split(',').collect();
-                        state.deleted_chunks.insert(chunk_details[1].to_owned());
-                        state.chunk_to_boundry_map.remove(item);
+                        let tokens: Vec<&str> = item.split(',').collect();
+                        let chunk_details = state
+                            .chunk_id_to_detail_map
+                            .get_mut(tokens[1])
+                            .expect("Delet record found for non existent chunk");
+                        chunk_details.mark_deleted();
                     }
                     _ => {
                         error!(%log,"Log with invalid operation found");

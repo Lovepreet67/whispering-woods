@@ -28,7 +28,7 @@ impl DatanodeService {
     pub async fn store_chunk(
         &self,
         chunk_id: String,
-        chunk_size:u64,
+        chunk_size: u64,
         replica_set: Vec<DataNodeMeta>,
         mut read_stream: (impl AsyncRead + Unpin),
     ) -> Result<()> {

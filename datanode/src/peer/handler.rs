@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use proto::generated::datanode_datanode::{
     CommitChunkRequest, CommitChunkResponse, CreatePipelineRequest, CreatePipelineResponse,
-    peer_server::Peer,
+    StoreChunkRequest, StoreChunkResponse, peer_server::Peer,
 };
 use storage::{file_storage::FileStorage, storage::Storage};
 use tokio::{net::TcpStream, sync::Mutex};
@@ -83,6 +83,16 @@ impl Peer for PeerHandler {
             );
         }
         let response = CreatePipelineResponse {
+            address: CONFIG.external_tcp_addrs.clone(),
+        };
+        Ok(tonic::Response::new(response))
+    }
+    #[instrument(name="grpc_peer_store_chunk",skip(self,_request),fields(chunk_id = %_request.get_ref().chunk_id))]
+    async fn store_chunk(
+        &self,
+        _request: tonic::Request<StoreChunkRequest>,
+    ) -> std::result::Result<tonic::Response<StoreChunkResponse>, tonic::Status> {
+        let response = StoreChunkResponse {
             address: CONFIG.external_tcp_addrs.clone(),
         };
         Ok(tonic::Response::new(response))

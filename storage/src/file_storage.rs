@@ -1,5 +1,8 @@
-use std::path::{Path, PathBuf};
-use sysinfo::{Disks};
+use std::{
+    os::unix::fs::MetadataExt,
+    path::{Path, PathBuf},
+};
+use sysinfo::Disks;
 use tracing::{error, info, instrument};
 
 use crate::storage::{Result, Storage};
@@ -110,6 +113,12 @@ impl Storage for FileStorage {
             }
         }
         Ok(chunk_ids)
+    }
+    #[instrument(name = "file_storage_chunk_size", skip(self))]
+    async fn get_chunk_size(&self, chunk_id: &str) -> Result<u64> {
+        let chunk_path = self.get_committed_path(chunk_id);
+        let chunk_file_metadata = fs::metadata(chunk_path).await?;
+        Ok(chunk_file_metadata.size())
     }
     fn available_storage(&self) -> Result<usize> {
         let canonical_path = std::fs::canonicalize(&self.root).unwrap();

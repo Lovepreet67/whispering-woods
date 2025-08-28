@@ -1,13 +1,42 @@
 filebeat.inputs:
+  # Normal logs
   - type: log
     enabled: true
     paths:
       - "/app/logs/**/*.log"
+    exclude_files: ["state\\.log$"]   # exclude state.log here
     json.keys_under_root: true
     json.add_error_key: true
+    fields:
+      log_type: app
+    fields_under_root: true
+
+  # State logs
+  - type: log
+    enabled: true
+    paths:
+      - /app/logs/state.log
+    json.keys_under_root: true
+    json.add_error_key: true
+    fields:
+      log_type: state
+    fields_under_root: true
+
 output.elasticsearch:
-  hosts: ["${ES_HOST:http://host.docker.internal:9200}"]
+  hosts: ["http://host.docker.internal:9200"]
   username: "${ELASTIC_USERNAME:elastic}"
-  password: "${ELASTIC_PASSWORD:password}"  # Leave blank if xpack security is disabled
+  password: "${ELASTIC_PASSWORD:password}"
+
+  indices:
+    - index: "gfs-app-logs"
+      when.equals:
+        log_type: "app"
+    - index: "gfs-state-logs"
+      when.equals:
+        log_type: "state"
+
+setup.kibana:
+  host: "http://kibana:5601"
 
 setup.ilm.enabled: false
+

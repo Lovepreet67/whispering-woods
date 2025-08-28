@@ -78,7 +78,8 @@ impl TCPService {
             if let Some(mut pipeline) = state.lock().await.chunk_to_pipline.remove(&chunk_id) {
                 // create tee only if you need one otherwise 2nd stream will not be consumed and
                 // program will be in lockin
-                let (mut stream1, mut stream2) = stream_tee::tee_tcp_stream(limited_read_stream,write_stream);
+                let (mut stream1, mut stream2) =
+                    stream_tee::tee_tcp_stream(limited_read_stream, write_stream);
                 pipeline.write_all(&chunk_id_bytes).await?;
                 pipeline.write_u8(mode).await?;
                 pipeline.write_u64(chunk_size).await?;

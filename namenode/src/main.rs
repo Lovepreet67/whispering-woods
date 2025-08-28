@@ -1,12 +1,9 @@
 mod chunk_generator;
 mod client_handler;
 mod config;
-mod data_structure;
 mod datanode;
 mod ledger;
 mod namenode_state;
-mod state_mantainer;
-
 use client_handler::ClientHandler;
 use config::CONFIG;
 use datanode::handler::DatanodeHandler;
@@ -15,11 +12,12 @@ use proto::generated::{
     client_namenode::client_name_node_server::ClientNameNodeServer,
     datanode_namenode::datanode_namenode_server::DatanodeNamenodeServer,
 };
-use state_mantainer::StateMantainer;
 use std::{error::Error, sync::Arc};
 use tokio::sync::Mutex;
 use tonic::transport::Server;
 use utilities::logger::{error, info, init_logger};
+
+use crate::namenode_state::state_mantainer::StateMantainer;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -49,7 +47,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     };
     let state = Arc::new(Mutex::new(state_history));
-    let state_mantainer = StateMantainer::new(state.clone());
+    let state_mantainer = StateMantainer::new(state.clone()).await;
     state_mantainer.start();
     // first we will start grpc server
     Server::builder()

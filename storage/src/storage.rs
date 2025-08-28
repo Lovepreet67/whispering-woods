@@ -13,6 +13,7 @@ pub trait Storage {
     async fn read(&self, chunk_id: String) -> Result<Box<dyn io::AsyncRead + Unpin + Send>>;
     async fn delete(&self, chunk_id: String) -> Result<bool>;
     async fn available_chunks(&self) -> Result<Vec<String>>;
+    async fn get_chunk_size(&self, chunk_id: &str) -> Result<u64>;
     fn available_storage(&self) -> Result<usize>;
 }
 

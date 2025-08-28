@@ -25,7 +25,6 @@ impl GrpcChannelPool {
         let endpoint = Endpoint::from_str(addrs)
             .map_err(|e| format!("Error while creating an endpoint {e} for location {addrs}"))?
             .connect_timeout(Duration::from_secs(5));
-
         let chnl = retry_with_backoff(
             || {
                 async {

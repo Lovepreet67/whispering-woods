@@ -1,10 +1,10 @@
-use std::{sync::Arc, time::Instant};
+use std::sync::Arc;
 
 use tokio::sync::Mutex;
 use utilities::logger::{instrument, tracing};
 
-use crate::namenode_state;
 use crate::namenode_state::NamenodeState;
+use crate::namenode_state::datanode_details::DatanodeDetail;
 
 use proto::generated::datanode_namenode::{
     ConnectionRequest, ConnectionResponse, HeartBeatRequest, HeartBeatResponse, StateSyncRequest,
@@ -32,13 +32,11 @@ impl DatanodeNamenode for DatanodeHandler {
         let heart_beat_request = request.into_inner();
         //trace!("got heartbeat request {:?}", heart_beat_request);
         let mut state = self.state.lock().await;
-        let response = if state
-            .datanode_to_meta_map
-            .contains_key(&heart_beat_request.datanode_id)
+        let response = if let Some(datanode_details) = state
+            .datanode_to_detail_map
+            .get_mut(&heart_beat_request.datanode_id)
         {
-            state
-                .datanode_to_heart_beat_time
-                .insert(heart_beat_request.datanode_id, Instant::now());
+            datanode_details.mark_heartbeat();
             HeartBeatResponse {
                 connection_alive: true,
             }
@@ -60,23 +58,30 @@ impl DatanodeNamenode for DatanodeHandler {
             connection_request.id
         );*/
         let mut state = self.state.lock().await;
-        // if the connection already exist for this we will not accept connection
-        let response = if state
-            .datanode_to_meta_map
-            .contains_key(&connection_request.id)
+        // if the connection already exist we will accept the connection and mark node as active
+        let response = if let Some(datanode_details) =
+            state.datanode_to_detail_map.get_mut(&connection_request.id)
         {
-            ConnectionResponse {
-                connected: false,
-                msg: "Connection already exist for the specified id".to_owned(),
+            if datanode_details.is_active() {
+                ConnectionResponse {
+                    connected: false,
+                    msg: "Connection already exist for the specified id".to_owned(),
+                }
+            } else {
+                datanode_details.mark_heartbeat();
+                ConnectionResponse {
+                    connected: true,
+                    msg: "Connection restablished".to_owned(),
+                }
             }
         } else {
-            state.datanode_to_meta_map.insert(
+            state.datanode_to_detail_map.insert(
                 connection_request.id.clone(),
-                proto::generated::client_namenode::DataNodeMeta {
-                    id: connection_request.id,
-                    name: connection_request.name,
-                    addrs: connection_request.addrs,
-                },
+                DatanodeDetail::new(
+                    connection_request.id,
+                    connection_request.name,
+                    connection_request.addrs,
+                ),
             );
             ConnectionResponse {
                 connected: true,
@@ -93,34 +98,34 @@ impl DatanodeNamenode for DatanodeHandler {
     ) -> Result<tonic::Response<StateSyncResponse>, tonic::Status> {
         let state_sync_request = request.into_inner();
         let mut state = self.state.lock().await;
-        state.datanode_to_state_map.insert(
-            state_sync_request.id.clone(),
-            namenode_state::DatanodeState {
-                storage_remaining: state_sync_request.availabe_storage,
-            },
-        );
-        for chunk_id in state_sync_request.available_chunks {
-            let mut locations = state
-                .chunk_to_location_map
-                .remove(&chunk_id)
-                .unwrap_or(vec![]);
-
-            //TODO: store location in set so that we can directly insert it instead for first checking
-
-            // check if location already exist
-            let mut already_exist = false;
-            for location in &locations {
-                if *location == state_sync_request.id {
-                    already_exist = true;
-                    break;
-                }
-            }
-            if !already_exist {
-                locations.push(state_sync_request.id.clone());
-            }
-            state.chunk_to_location_map.insert(chunk_id, locations);
+        if let Some(datanode_details) = state.datanode_to_detail_map.get_mut(&state_sync_request.id)
+        {
+            datanode_details.sync_state(state_sync_request.availabe_storage);
         }
-        let response = StateSyncResponse {};
+        let mut chunks_to_be_deleted = vec![];
+        for chunk_id in &state_sync_request.available_chunks {
+            if let Some(chunk_details) = state.chunk_id_to_detail_map.get_mut(chunk_id) {
+                if chunk_details.is_deleted() {
+                    chunks_to_be_deleted.push(chunk_id.to_owned());
+                    continue;
+                }
+                chunk_details.add_location(&state_sync_request.id);
+            } else {
+                chunks_to_be_deleted.push(chunk_id.to_owned());
+            }
+        }
+        state
+            .chunk_id_to_detail_map
+            .iter_mut()
+            .filter(|(_, chunk_meta)| chunk_meta.locations.contains(&state_sync_request.id))
+            .for_each(|(chunk_id, chunk_meta)| {
+                if !state_sync_request.available_chunks.contains(chunk_id) {
+                    chunk_meta.remove_location(&state_sync_request.id);
+                }
+            });
+        let response = StateSyncResponse {
+            chunks_to_be_deleted,
+        };
         Ok(tonic::Response::new(response))
     }
 }

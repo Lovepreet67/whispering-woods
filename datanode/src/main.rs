@@ -81,19 +81,29 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // heartbeat sending logic
     let namenode_service = NamenodeService::new(state.clone());
     tokio::spawn(async move {
-        match namenode_service.connect().await {
-            Ok(v) => {
-                if v {
-                    info!("successfully connected to the namenode");
-                } else {
-                    info!("Namenode refused to connect hence terminating");
+        let max_retry_count = 5;
+        let mut retry_count = 0;
+        loop {
+            match namenode_service.connect().await {
+                Ok(v) => {
+                    if v {
+                        info!("successfully connected to the namenode");
+                        break;
+                    } else {
+                        if retry_count == max_retry_count {
+                            error!("Namenode refuse to connect after {max_retry_count} hence terminating");
+                            std::process::exit(1);
+                        }
+                        retry_count += 1;
+                        info!("Namenode refused to connect retrying...");
+                    }
+                }
+                Err(e) => {
+                    error!("{e}");
                     std::process::exit(1);
                 }
             }
-            Err(e) => {
-                error!("{e}");
-                std::process::exit(1);
-            }
+            sleep(Duration::from_secs(retry_count*5)).await;
         }
         // after every 10 heartbeats we will share state with name node;
         let mut x: u8 = 0;

@@ -5,6 +5,7 @@ package datanode_datanode;
 import "client_namenode.proto";
 service Peer{
   rpc CreatePipeline(CreatePipelineRequest) returns (CreatePipelineResponse);
+  rpc StoreChunk(StoreChunkRequest) returns (StoreChunkResponse);
   rpc CommitChunk(CommitChunkRequest) returns (CommitChunkResponse);
 }
 
@@ -14,6 +15,14 @@ message CreatePipelineRequest {
 }
 message CreatePipelineResponse {
   string address = 1;
+}
+
+message StoreChunkRequest {
+  string chunk_id=1;
+}
+
+message StoreChunkResponse{
+  string address =1;
 }
 
 message CommitChunkRequest {

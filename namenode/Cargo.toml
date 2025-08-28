@@ -13,3 +13,4 @@ utilities = {path = "../utilities"}
 figment = {version="0.10.19", features=["yaml"]}
 serde = { version = "1.0.219", features = ["derive"] }
 once_cell = "1.21.3"
+futures = "0.3.31"

@@ -1,11 +1,13 @@
 use tokio::{
-    io::{duplex, AsyncReadExt, AsyncWriteExt, DuplexStream,Take},
-    net::{tcp::{OwnedReadHalf, OwnedWriteHalf}},
+    io::{AsyncReadExt, AsyncWriteExt, DuplexStream, Take, duplex},
+    net::tcp::{OwnedReadHalf, OwnedWriteHalf},
 };
 use utilities::logger::{Instrument, Span, error, trace};
 
-pub fn tee_tcp_stream(mut read_stream: Take<OwnedReadHalf>,mut write_stream:OwnedWriteHalf) -> (DuplexStream, DuplexStream) {
-
+pub fn tee_tcp_stream(
+    mut read_stream: Take<OwnedReadHalf>,
+    mut write_stream: OwnedWriteHalf,
+) -> (DuplexStream, DuplexStream) {
     let span = Span::current();
     let (mut tx1, rx1) = duplex(8192); // 8192 is 8kb
     let (mut tx2, rx2) = duplex(8192);

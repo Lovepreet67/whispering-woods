@@ -3,7 +3,15 @@ syntax = "proto3";
 package namenode_datanode;
 
 service NamenodeDatanode {
+  rpc ReplicateChunk(ReplicateChunkRequest)returns (ReplicateChunkResponse);
   rpc DeleteChunk(DeleteChunkRequest)returns (DeleteChunkResponse);
+}
+
+message ReplicateChunkRequest {
+  string targetDataNode = 1;
+  string chunkId = 2;
+}
+message ReplicateChunkResponse {
 }
 
 message DeleteChunkRequest {

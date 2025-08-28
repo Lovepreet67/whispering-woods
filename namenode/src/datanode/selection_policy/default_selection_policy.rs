@@ -1,5 +1,5 @@
 use super::selection_policy::DatanodeSelectionPolicy;
-use crate::namenode_state::{self, NamenodeState};
+use crate::namenode_state::NamenodeState;
 use proto::generated::client_namenode::DataNodeMeta;
 use std::{error::Error, sync::Arc};
 use tokio::sync::Mutex;
@@ -21,36 +21,106 @@ impl DatanodeSelectionPolicy for DefaultDatanodeSelectionPolicy {
         &self,
         chunk_size: u64,
     ) -> Result<Vec<DataNodeMeta>, Box<dyn Error>> {
-        let namenode_state = self.namenode_state.lock().await;
-        let datanodes: Vec<_> = namenode_state
-            .active_datanodes
-            .iter()
-            .filter_map(|datanode| {
-                let state = namenode_state.datanode_to_state_map.get(datanode)?;
-                let meta = namenode_state.datanode_to_meta_map.get(datanode)?;
-                if state.storage_remaining > chunk_size {
-                    return Some(meta.clone());
-                }
-                None
-            })
+        let state = self.namenode_state.lock().await;
+        let candidates: Vec<DataNodeMeta> = state
+            .datanode_to_detail_map
+            .values()
+            .filter(|datanode_detail| datanode_detail.can_store(chunk_size))
             .take(3)
+            .map(|datanode_detail| datanode_detail.into())
             .collect();
-        Ok(datanodes)
+        if candidates.is_empty() {
+            return Err("No datanode available to store chunk".into());
+        }
+        return Ok(candidates);
     }
     #[instrument(name = "policy_datanode_selection_to_serve", skip(self))]
     async fn get_datanodes_to_serve(&self, chunk_id: &str) -> Result<DataNodeMeta, Box<dyn Error>> {
         let namenode_state = self.namenode_state.lock().await;
-        if let Some(location) = namenode_state.chunk_to_location_map.get(chunk_id) {
-            // return the first datanode
-            if let Some(datanode) = namenode_state.datanode_to_meta_map.get(
-                location
-                    .iter()
-                    .find(|&datanode_id| namenode_state.active_datanodes.contains(datanode_id))
-                    .expect("No active datanodes for chunk"),
-            ) {
-                return Ok(datanode.clone());
-            }
-        }
-        return Err(format!("can't locate chunk : {chunk_id}").into());
+        let candidate = namenode_state
+            .chunk_id_to_detail_map
+            .get(chunk_id)
+            .expect(&format!(
+                "Error while fetching chunk detals for chunk {chunk_id}"
+            ))
+            .get_locations()
+            .iter()
+            .map(|location| namenode_state.datanode_to_detail_map.get(location))
+            .find_map(|datanode_details| {
+                if datanode_details.is_some() && datanode_details.unwrap().is_active() {
+                    return datanode_details;
+                }
+                None
+            })
+            .expect(&format!(
+                "No chunk details available to provide chunk {chunk_id}"
+            ));
+        return Ok(candidate.into());
+    }
+    async fn get_datanodes_to_repair(
+        &self,
+        chunk_id: &str,
+    ) -> Result<(DataNodeMeta, DataNodeMeta), Box<dyn Error>> {
+        let state = self.namenode_state.lock().await;
+        // fair assumption that chunk meta is present
+        let chunk_details = state.chunk_id_to_detail_map.get(chunk_id).unwrap();
+        let locations = chunk_details.get_locations();
+        let chunk_size = chunk_details.end_offset - chunk_details.start_offset;
+        let target_datanode =
+            match state
+                .datanode_to_detail_map
+                .iter()
+                .find_map(|(datanode_id, datanode_details)| {
+                    if datanode_details.can_store(chunk_size) && !locations.contains(datanode_id)
+                    // locations size will be less than
+                    // default replica count
+                    {
+                        return Some(datanode_details);
+                    }
+                    None
+                }) {
+                Some(target) => target,
+                None => return Err("Datanode with sufficent storage is not available".into()),
+            };
+        Ok((
+            state
+                .datanode_to_detail_map
+                .get(&locations[0])
+                .unwrap()
+                .into(),
+            target_datanode.into(),
+        ))
+    }
+    // choose node with lowest available storage among candidates
+    async fn get_datanode_to_offload(
+        &self,
+        chunk_id: &str,
+        count: usize,
+    ) -> Result<Vec<DataNodeMeta>, Box<dyn Error>> {
+        let state = self.namenode_state.lock().await;
+        // it is a fair assumption that there are more than 3 locations for overreplicated chunk
+        let mut locations = state
+            .chunk_id_to_detail_map
+            .get(chunk_id)
+            .unwrap()
+            .get_locations();
+        locations.sort_by(|a, b| {
+            let available_storage_a = state
+                .datanode_to_detail_map
+                .get(a)
+                .unwrap()
+                .storage_remaining;
+            let available_storage_b = state
+                .datanode_to_detail_map
+                .get(b)
+                .unwrap()
+                .storage_remaining;
+            available_storage_b.cmp(&available_storage_a)
+        });
+        Ok(locations
+            .iter()
+            .take(count)
+            .map(|location| state.datanode_to_detail_map.get(location).unwrap().into())
+            .collect())
     }
 }

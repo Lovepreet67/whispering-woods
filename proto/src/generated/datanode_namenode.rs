@@ -24,8 +24,11 @@ pub struct StateSyncRequest {
     #[prost(string, repeated, tag = "3")]
     pub available_chunks: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
-#[derive(Clone, Copy, PartialEq, ::prost::Message)]
-pub struct StateSyncResponse {}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct StateSyncResponse {
+    #[prost(string, repeated, tag = "1")]
+    pub chunks_to_be_deleted: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+}
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct HeartBeatRequest {
     #[prost(string, tag = "1")]
