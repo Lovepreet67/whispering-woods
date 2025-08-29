@@ -53,7 +53,7 @@ sleep 3
 # DMG_DIR="$(pwd)/disks/"
 # MOUNT_BASE="/Volumes"
 DATANODE_COUNT=${1:-3}
-# DISK_SIZE="1g"
+# DISK_SIZE="100m"
 
 # mkdir -p "$DMG_DIR"
 
@@ -61,12 +61,13 @@ echo "Starting $DATANODE_COUNT DataNodes..."
 for ((i = 0; i < DATANODE_COUNT; i++)); do
   # for testing available storage only works on mac
   # dmg_path="$DMG_DIR/datanode${i}.dmg"
-  # mount_point="$MOUNT_BASE/datanode${i}"
-  # echo "Creating disk image: $dmg_path ($DISK_SIZE)..."
-  # hdiutil create -size "$DISK_SIZE" -fs APFS -volname "datanode${i}" "$dmg_path" -ov
-  #
-  # echo "Mounting $dmg_path to $mount_point .."
-  # hdiutil attach "$dmg_path" -mountpoint "$mount_point"
+   volume_name="datanode-${i}"
+   echo "Creating docker volume : $volume_name ($DISK_SIZE)..."
+ # docker volume create --driver local \
+ #   --opt type=tmpfs \
+ #   --opt device=tmpfs \
+ #   --opt o=size=$DISK_SIZE \
+ #   $volume_name
   grpc_port=$((3000 + i*10))
   tcp_port=$((3001 + i*10))
 
@@ -79,7 +80,6 @@ for ((i = 0; i < DATANODE_COUNT; i++)); do
     -e RUST_LOG=datanode=trace,storage=trace,utilities=trace \
     -v "$(pwd)/cluster_configs/datanode/datanode${i}.yaml":/app/container.yaml \
     gfs-datanode
-    # -v "$mount_point":/app/store \
 done
 
 
