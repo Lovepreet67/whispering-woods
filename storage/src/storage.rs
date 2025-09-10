@@ -25,6 +25,14 @@ pub mod tests {
 
     use super::*;
     pub async fn storage_test(storage: impl Storage) -> Result<()> {
+        // testing available storage
+        let available_bytes = storage.available_storage()?;
+        let should_be_bytes: usize = 128 * 1024 * 1024;
+        let epsilon: usize = 8 * 1024 * 1024;
+        assert!(
+            available_bytes <= should_be_bytes && available_bytes > (should_be_bytes - epsilon),
+            "Available Storage is not correct"
+        );
         let chunk_id = "test_chunk.bin".to_string();
         let original_data = b"hello world";
 
@@ -33,6 +41,7 @@ pub mod tests {
         let written = storage.write(chunk_id.clone(), &mut input_stream).await?;
         assert_eq!(written as usize, original_data.len());
         // testing availbale chunks
+        storage.commit(chunk_id.clone()).await?;
         let available_chunks = storage.available_chunks().await?;
         assert_eq!(available_chunks, vec!["test_chunk.bin".to_string()]);
 

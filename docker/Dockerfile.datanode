@@ -1,4 +1,5 @@
-FROM rust:latest as builder
+FROM rust:bookworm as builder 
+# Using the bookworm to support libc 2.36 in bookworm:slim
 
 WORKDIR /usr/src/app
 

@@ -50,24 +50,10 @@ sleep 3
 # -----------------------
 # Start a datanode
 # -----------------------
-# DMG_DIR="$(pwd)/disks/"
-# MOUNT_BASE="/Volumes"
 DATANODE_COUNT=${1:-3}
-# DISK_SIZE="100m"
-
-# mkdir -p "$DMG_DIR"
 
 echo "Starting $DATANODE_COUNT DataNodes..."
 for ((i = 0; i < DATANODE_COUNT; i++)); do
-  # for testing available storage only works on mac
-  # dmg_path="$DMG_DIR/datanode${i}.dmg"
-   volume_name="datanode-${i}"
-   echo "Creating docker volume : $volume_name ($DISK_SIZE)..."
- # docker volume create --driver local \
- #   --opt type=tmpfs \
- #   --opt device=tmpfs \
- #   --opt o=size=$DISK_SIZE \
- #   $volume_name
   grpc_port=$((3000 + i*10))
   tcp_port=$((3001 + i*10))
 
@@ -79,7 +65,9 @@ for ((i = 0; i < DATANODE_COUNT; i++)); do
     -e CONFIG_PATH="./container.yaml" \
     -e RUST_LOG=datanode=trace,storage=trace,utilities=trace \
     -v "$(pwd)/cluster_configs/datanode/datanode${i}.yaml":/app/container.yaml \
+    --tmpfs /app/store:rw,size=128m \
     gfs-datanode
+
 done
 
 
