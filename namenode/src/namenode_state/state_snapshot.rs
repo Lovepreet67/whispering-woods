@@ -49,3 +49,31 @@ impl PartialEq for NamenodeStateSnapshot {
             && self.file_to_chunk_map == other.file_to_chunk_map
     }
 }
+
+use std::sync::Arc;
+use tokio::sync::Mutex;
+
+#[derive(Clone, Debug)]
+pub struct SnapshotStore {
+    snapshot: Arc<Mutex<NamenodeStateSnapshot>>,
+}
+
+impl SnapshotStore {
+    pub fn new() -> Self {
+        Self {
+            snapshot: Arc::new(Mutex::new(NamenodeStateSnapshot::from(
+                NamenodeState::default(),
+            ))),
+        }
+    }
+
+    pub async fn update_snapshot(&self, new_snapshot: NamenodeStateSnapshot) {
+        let mut curr_snapshot = self.snapshot.lock().await;
+        *curr_snapshot = new_snapshot;
+    }
+
+    pub async fn get_snapshot(&self) -> NamenodeStateSnapshot {
+        let curr_snapshot = self.snapshot.lock().await;
+        curr_snapshot.clone()
+    }
+}

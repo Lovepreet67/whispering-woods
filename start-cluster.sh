@@ -36,6 +36,7 @@ echo "filebeat container is running now"
 echo "starting namenode"
 docker run -d \
   -p 7000:7000 \
+  -p 8080:8080 \
   -e ENV=$ENV \
   -e RUST_LOG=namenode=trace \
   -e CONFIG_PATH="./container.yaml" \
@@ -65,7 +66,7 @@ for ((i = 0; i < DATANODE_COUNT; i++)); do
     -e CONFIG_PATH="./container.yaml" \
     -e RUST_LOG=datanode=trace,storage=trace,utilities=trace \
     -v "$(pwd)/cluster_configs/datanode/datanode${i}.yaml":/app/container.yaml \
-    --tmpfs /app/store:rw,size=128m \
+    --tmpfs /app/store:rw,size=512m \
     gfs-datanode
 
 done
