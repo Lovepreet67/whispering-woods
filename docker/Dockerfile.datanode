@@ -1,14 +1,47 @@
-
-FROM rust:latest as builder
+FROM rust:bookworm as builder 
+# Using the bookworm to support libc 2.36 in bookworm:slim
 
 WORKDIR /usr/src/app
-RUN cargo new --bin base_with_dependencies
 
-COPY . .
+# intialy we will copy the cargo.lock and cargo.toml file 
+COPY Cargo.lock Cargo.toml ./
 
+# then we will create seprate crates for each bin and lib
+RUN mkdir -p proto utilities/src storage/src datanode/src client/src namenode/src
+
+# we will copy the entire proto because it will rarely change
+COPY proto/ ./proto/
+
+#then we will copy the cargo file and create dummy code for this
+COPY utilities/Cargo.toml ./utilities/
+RUN echo "pub fn build(){}" > ./utilities/src/lib.rs 
+
+COPY storage/Cargo.toml ./storage/
+RUN echo "pub fn build(){}" > ./storage/src/lib.rs 
+
+COPY datanode/Cargo.toml ./datanode/
+RUN echo "fn main(){panic!();}" > ./datanode/src/main.rs 
+
+COPY client/Cargo.toml ./client/
+RUN echo "fn main(){}" > ./client/src/main.rs 
+
+COPY namenode/Cargo.toml ./namenode/
+RUN echo "fn main(){}" > ./namenode/src/main.rs 
+
+# Now we will create a build of this
 ENV SKIP_PROTO_BUILD=1
-RUN cargo build --release --bin datanode 
+RUN cargo build 
+# Now we will copy entire code
 
+COPY utilities/src ./utilities/src
+COPY storage/src ./storage/src
+COPY datanode/src ./datanode/src
+
+RUN touch ./Cargo.lock
+RUN touch utilities/src/lib.rs
+RUN touch storage/src/lib.rs
+RUN touch datanode/src/main.rs
+RUN cargo build --release --bin datanode 
 # --- Final runtime image ---
 FROM debian:bookworm-slim
 

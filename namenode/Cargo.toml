@@ -14,3 +14,6 @@ figment = {version="0.10.19", features=["yaml"]}
 serde = { version = "1.0.219", features = ["derive"] }
 once_cell = "1.21.3"
 futures = "0.3.31"
+rocket = {version="0.5.1", features = ["json"]}
+rocket_cors = "0.6.0"
+jsonwebtoken = "9.3.1"

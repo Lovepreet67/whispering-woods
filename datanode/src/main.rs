@@ -39,9 +39,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
         "Starting the grpc server on address"
     );
     let state = Arc::new(Mutex::new(DatanodeState::new()));
-    info!(storage_path=%CONFIG.storage_path,"Creating storage");
-    let store = file_storage::FileStorage::new(CONFIG.storage_path.clone());
-
+    info!(storage_path = %CONFIG.storage_config.storage_path, "Creating storage");
+    let store = file_storage::FileStorage::new(CONFIG.storage_config.clone().into()).await;
     let ch = ClientHandler::new(state.clone(), store.clone());
     let ph = peer::handler::PeerHandler::new(state.clone(), store.clone());
     // first we will start grpc server

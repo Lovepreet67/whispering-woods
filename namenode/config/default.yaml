@@ -4,4 +4,7 @@ external_grpc_addrs: http://127.0.0.1:7000,
 ledger_file: ./temp/namenode/history.log
 log_level: trace
 log_base: ./temp/namenode/
+state_log_file: ./temp/namenode/state.log
 apm_endpoint:  http://127.0.0.1:8200/v1/traces
+api_port: 8080
+api_jwt_sign_key: nothing to secure route is read only

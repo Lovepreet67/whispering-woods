@@ -11,7 +11,7 @@ use crate::datanode::selection_policy::selection_policy::DatanodeSelectionPolicy
 use crate::datanode::service::DatanodeService;
 use crate::namenode_state::NamenodeState;
 use crate::namenode_state::chunk_details::ChunkReplicationStatus;
-use crate::namenode_state::state_snapshot::NamenodeStateSnapshot;
+use crate::namenode_state::state_snapshot::{NamenodeStateSnapshot, SnapshotStore};
 use std::path;
 use utilities::state_logger;
 
@@ -21,10 +21,14 @@ pub struct StateMantainer {
     datanode_service: DatanodeService,
     datanode_selection_policy: Arc<Mutex<Box<dyn DatanodeSelectionPolicy + Send + Sync>>>,
     namenode_state: Arc<Mutex<NamenodeState>>,
+    snapshot_store: SnapshotStore,
 }
 
 impl StateMantainer {
-    pub async fn new(namenode_state: Arc<Mutex<NamenodeState>>) -> Self {
+    pub async fn new(
+        namenode_state: Arc<Mutex<NamenodeState>>,
+        snapshot_store: SnapshotStore,
+    ) -> Self {
         let tx = state_logger::StateLogger::<NamenodeStateSnapshot, _>::start(
             NamenodeState::default(),
             path::Path::new(
@@ -44,6 +48,7 @@ impl StateMantainer {
             ))),
             namenode_state,
             snapshot_sender: tx,
+            snapshot_store,
         }
     }
     // this function is fire and forget
@@ -150,6 +155,9 @@ impl StateMantainer {
                         }
                     });
                 debug!("Sending state to state logger");
+                self.snapshot_store
+                    .update_snapshot(state.clone().into())
+                    .await;
                 match self.snapshot_sender.send(state.clone()).await {
                     Ok(_) => {}
                     Err(e) => {

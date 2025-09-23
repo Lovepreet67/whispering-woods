@@ -36,6 +36,7 @@ echo "filebeat container is running now"
 echo "starting namenode"
 docker run -d \
   -p 7000:7000 \
+  -p 8080:8080 \
   -e ENV=$ENV \
   -e RUST_LOG=namenode=trace \
   -e CONFIG_PATH="./container.yaml" \
@@ -50,23 +51,10 @@ sleep 3
 # -----------------------
 # Start a datanode
 # -----------------------
-# DMG_DIR="$(pwd)/disks/"
-# MOUNT_BASE="/Volumes"
 DATANODE_COUNT=${1:-3}
-# DISK_SIZE="1g"
-
-# mkdir -p "$DMG_DIR"
 
 echo "Starting $DATANODE_COUNT DataNodes..."
 for ((i = 0; i < DATANODE_COUNT; i++)); do
-  # for testing available storage only works on mac
-  # dmg_path="$DMG_DIR/datanode${i}.dmg"
-  # mount_point="$MOUNT_BASE/datanode${i}"
-  # echo "Creating disk image: $dmg_path ($DISK_SIZE)..."
-  # hdiutil create -size "$DISK_SIZE" -fs APFS -volname "datanode${i}" "$dmg_path" -ov
-  #
-  # echo "Mounting $dmg_path to $mount_point .."
-  # hdiutil attach "$dmg_path" -mountpoint "$mount_point"
   grpc_port=$((3000 + i*10))
   tcp_port=$((3001 + i*10))
 
@@ -78,8 +66,9 @@ for ((i = 0; i < DATANODE_COUNT; i++)); do
     -e CONFIG_PATH="./container.yaml" \
     -e RUST_LOG=datanode=trace,storage=trace,utilities=trace \
     -v "$(pwd)/cluster_configs/datanode/datanode${i}.yaml":/app/container.yaml \
+    --tmpfs /app/store:rw,size=512m \
     gfs-datanode
-    # -v "$mount_point":/app/store \
+
 done
 
 

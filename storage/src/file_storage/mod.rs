@@ -1,11 +1,14 @@
+mod platform_utility;
 use std::{
     os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
 };
-use sysinfo::Disks;
 use tracing::{error, info, instrument};
 
-use crate::storage::{Result, Storage};
+use crate::{
+    file_storage::platform_utility::{available_storage, create_mount, detach_device},
+    storage::{Result, Storage},
+};
 use tokio::{
     fs::{self, File},
     io::copy,
@@ -14,18 +17,26 @@ use tokio::{
 #[derive(Clone)]
 pub struct FileStorage {
     root: String,
+    device_id: Option<String>,
+}
+pub struct FileStorageConfig {
+    pub root: String,
+    pub create_mount: bool,
+    pub mount_size_in_mega_byte: u64,
 }
 impl FileStorage {
-    pub fn new(root: String) -> Self {
-        match std::fs::create_dir_all(&root) {
-            Ok(_v) => {
+    pub async fn new(config: FileStorageConfig) -> Self {
+        let root: &str = config.root.as_ref();
+        let device_id = match create_mount(&config).await {
+            Ok(v) => {
                 info!(%root,"Created root for storage");
+                v
             }
             Err(e) => {
                 error!(%root,error=%e,"Error while creating the root for storage");
                 panic!("Error during creating directory")
             }
-        }
+        };
         match std::fs::create_dir_all(format!("{root}/staged")) {
             Ok(_v) => {
                 info!(%root,"Created staging dir for storage");
@@ -35,8 +46,24 @@ impl FileStorage {
                 panic!("Error during staging directory")
             }
         }
-
-        FileStorage { root }
+        FileStorage {
+            root: root.to_owned(),
+            device_id,
+        }
+    }
+    // not implementing drop trait because we need data to persist in crash
+    pub fn cleanup(&self) {
+        if let Some(device_id) = &self.device_id {
+            match detach_device(device_id) {
+                Ok(()) => {
+                    // this will never panic
+                    std::fs::remove_dir_all(self.root.clone()).unwrap();
+                }
+                Err(e) => {
+                    panic!("Error while cleaning up storage {}", e);
+                }
+            }
+        }
     }
     fn get_committed_path(&self, chunk_id: &str) -> PathBuf {
         Path::new(&self.root).join(chunk_id).to_path_buf()
@@ -121,33 +148,29 @@ impl Storage for FileStorage {
         Ok(chunk_file_metadata.size())
     }
     fn available_storage(&self) -> Result<usize> {
-        let canonical_path = std::fs::canonicalize(&self.root).unwrap();
-        let disks = Disks::new_with_refreshed_list();
-        let available_storage = disks
-            .iter()
-            .filter(|disk| canonical_path.starts_with(disk.mount_point()))
-            .max_by_key(|disk| disk.mount_point().as_os_str().len())
-            .map(|disk| disk.available_space())
-            .unwrap();
-        Ok(available_storage as usize)
+        available_storage(&self.root)
+    }
+}
+#[cfg(test)]
+impl Drop for FileStorage {
+    fn drop(&mut self) {
+        self.cleanup();
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::storage::tests::storage_test;
-    use tokio::fs;
-
     use super::*;
+    use crate::storage::tests::storage_test;
     #[tokio::test]
     async fn file_storage_test() -> Result<()> {
-        let storage = FileStorage::new("./temp".into());
-        fs::create_dir_all(&storage.root).await?;
-        let test_result = storage_test(storage).await; // we have to await here because other wise
-        // directory will be removed before running
-        // test
-        // cleaning up directory
-        fs::remove_dir("./temp").await?;
-        test_result
+        let config = FileStorageConfig {
+            root: "./test".to_owned(),
+            mount_size_in_mega_byte: 128,
+            create_mount: true,
+        };
+        let storage = FileStorage::new(config).await;
+        // fs::create_dir_all(&storage.root).await?;
+        storage_test(storage).await // we have to await here because other wise
     }
 }

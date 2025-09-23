@@ -1,3 +1,4 @@
+mod api_service;
 mod chunk_generator;
 mod client_handler;
 mod config;
@@ -17,7 +18,10 @@ use tokio::sync::Mutex;
 use tonic::transport::Server;
 use utilities::logger::{error, info, init_logger};
 
-use crate::namenode_state::state_mantainer::StateMantainer;
+use crate::{
+    api_service::rocket,
+    namenode_state::{state_mantainer::StateMantainer, state_snapshot::SnapshotStore},
+};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -47,8 +51,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     };
     let state = Arc::new(Mutex::new(state_history));
-    let state_mantainer = StateMantainer::new(state.clone()).await;
+    let snapshot_store = SnapshotStore::new();
+    let state_mantainer = StateMantainer::new(state.clone(), snapshot_store.clone()).await;
     state_mantainer.start();
+    // starting API service
+    tokio::spawn(async move {
+        info!("Starting a rocket server");
+        let _ = rocket(snapshot_store).launch().await;
+    });
     // first we will start grpc server
     Server::builder()
         .add_service(ClientNameNodeServer::new(ClientHandler::new(
