@@ -11,6 +11,9 @@ fn default_api_username() -> String {
 fn default_api_password() -> String {
     "password".to_string()
 }
+fn default_certificate_dir() -> String {
+    "./certificate".to_string()
+}
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Config {
@@ -28,7 +31,9 @@ pub struct Config {
     pub api_username: String,
     #[serde(default = "default_api_password")]
     pub api_password: String,
-    pub api_jwt_sign_key: String,
+    pub jwt_sign_key: String,
+    #[serde(default = "default_certificate_dir")]
+    pub certificate_dir: String,
 }
 impl Default for Config {
     fn default() -> Self {
@@ -44,7 +49,8 @@ impl Default for Config {
             api_port: Some(8080),
             api_username: "username".to_string(),
             api_password: "password".to_string(),
-            api_jwt_sign_key: "key".to_string(),
+            jwt_sign_key: "key".to_string(),
+            certificate_dir: "./certificate".to_string(),
         }
     }
 }

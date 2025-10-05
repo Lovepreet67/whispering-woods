@@ -1,3 +1,4 @@
+pub mod auth;
 pub mod grpc_channel_pool;
 pub mod logger;
 pub mod result;

@@ -1,51 +1,49 @@
-use crate::config::CONFIG;
-use jsonwebtoken::{DecodingKey, TokenData, Validation, decode, errors::Error};
 use rocket::{
     Request,
     http::Status,
-    outcome::Outcome,
     request::{self, FromRequest},
 };
-use serde::{Deserialize, Serialize};
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Claims {
-    pub sub: String,
-    pub exp: usize,
-}
-pub struct Username(String);
+use std::collections::HashMap;
+use utilities::auth::{AuthManager, types::NodeMetadata};
+
+pub struct NodeMetadataWrapper(pub NodeMetadata);
 #[rocket::async_trait]
-impl<'r> FromRequest<'r> for Username {
+impl<'r> FromRequest<'r> for NodeMetadataWrapper {
     type Error = Box<dyn std::error::Error>;
     async fn from_request(req: &'r Request<'_>) -> request::Outcome<Self, Self::Error> {
-        let token: &str = match req.headers().get_one("Authorization") {
-            Some(v) => v,
-            None => {
-                return request::Outcome::Error((
-                    Status::NonAuthoritativeInformation,
-                    "Please provide the auth token it is required"
-                        .to_string()
-                        .into(),
-                ));
-            }
-        };
-        println!("{}", token);
-        let decoded_result: Result<TokenData<Claims>, Error> = decode::<Claims>(
-            token,
-            &DecodingKey::from_secret(CONFIG.api_jwt_sign_key.as_ref()),
-            &Validation::default(),
-        );
-        match decoded_result {
-            Ok(data) => {
-                return Outcome::Success(Username(data.claims.sub));
-            }
-            Err(e) => {
-                println!("{:?}", e);
-                return request::Outcome::Error((
-                    Status::NonAuthoritativeInformation,
-                    "Please provide valid auth token ".to_string().into(),
-                ));
-            }
+        let mut headers = HashMap::new();
+        vec!["auth_type", "jwt_token", "id", "node_type", "cert"]
+            .into_iter()
+            .for_each(|key| {
+                if let Some(value) = req.headers().get_one(key) {
+                    headers.insert(key, value);
+                };
+            });
+        let authenticator = req.rocket().state::<AuthManager>().unwrap();
+        match authenticator.authenticate(&headers) {
+            Ok(node_meta) => return request::Outcome::Success(NodeMetadataWrapper(node_meta)),
+            Err(e) => match e {
+                utilities::auth::authentication_error::AuthenticationError::InvalidCredentials => {
+                    return request::Outcome::Error((
+                        Status::NonAuthoritativeInformation,
+                        "Invalid credentials".to_string().into(),
+                    ));
+                }
+                utilities::auth::authentication_error::AuthenticationError::MissingCredentials => {
+                    return request::Outcome::Error((
+                        Status::NonAuthoritativeInformation,
+                        "Please provide the auth token it is required"
+                            .to_string()
+                            .into(),
+                    ));
+                }
+                _ => {
+                    return request::Outcome::Error((
+                        Status::NonAuthoritativeInformation,
+                        "Invalid method choosen".to_string().into(),
+                    ));
+                }
+            },
         }
     }
 }
-

@@ -1,8 +1,9 @@
-use crate::{api_service::middleware::auth::Claims, config::CONFIG};
+use crate::config::CONFIG;
 use jsonwebtoken::{EncodingKey, Header, encode};
 use rocket::{post, serde::json::Json};
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
+use utilities::auth::jwt_token::Claims;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct LoginRequest {
@@ -27,10 +28,11 @@ pub async fn login(body: Json<LoginRequest>) -> Json<LoginResponse> {
         match encode(
             &Header::default(),
             &Claims {
-                sub: body.username,
+                id: body.username,
+                node_type: utilities::auth::types::NodeType::Client,
                 exp: exp as usize,
             },
-            &EncodingKey::from_secret(CONFIG.api_jwt_sign_key.as_ref()),
+            &EncodingKey::from_secret(CONFIG.jwt_sign_key.as_ref()),
         ) {
             Ok(signed_body) => {
                 return Json::from(LoginResponse::Token(signed_body));
