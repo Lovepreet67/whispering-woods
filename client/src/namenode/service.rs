@@ -1,8 +1,9 @@
+use crate::namenode::auth_intercepter::NamenodeAuthIntercepter;
 use proto::generated::client_namenode::{
     ChunkMeta, DeleteFileRequest, FetchFileRequest, FetchFileResponse, StoreFileRequest,
     client_name_node_client::ClientNameNodeClient,
 };
-use tonic::transport::Channel;
+use tonic::{service::interceptor::InterceptedService, transport::Channel};
 use utilities::{
     logger::{debug, instrument, tracing},
     result::Result,
@@ -10,11 +11,13 @@ use utilities::{
 
 #[derive(Clone, Debug)]
 pub struct NamenodeService {
-    connection: ClientNameNodeClient<Channel>,
+    connection: ClientNameNodeClient<InterceptedService<Channel, NamenodeAuthIntercepter>>,
 }
 
 impl NamenodeService {
-    pub fn new(connection: ClientNameNodeClient<Channel>) -> Self {
+    pub fn new(
+        connection: ClientNameNodeClient<InterceptedService<Channel, NamenodeAuthIntercepter>>,
+    ) -> Self {
         Self { connection }
     }
     #[instrument(name = "namenode_store_file", skip(self))]

@@ -1,4 +1,4 @@
-use crate::namenode_service::NamenodeService;
+use crate::namenode::service::NamenodeService;
 use utilities::{
     logger::{instrument, trace, tracing},
     result::Result,

@@ -48,6 +48,25 @@ echo "Namenode running"
 # Wait for namenode to boot up
 sleep 3 
 
+# We will login to the namenode and get jwt to generate certifcates for nodes
+NAMENODE_URL="http://localhost:8080"
+NAMENODE_USERNAME="username"
+NAMENODE_PASSWORD="password"
+
+echo "Logging in..."
+LOGIN_RESPONSE=$(curl -s -X POST "$NAMENODE_URL/auth/login" \
+  -H "Content-Type: application/json" \
+  -d "{\"username\": \"$NAMENODE_USERNAME\", \"password\": \"$NAMENODE_PASSWORD\"}")
+
+TOKEN=$(echo "$LOGIN_RESPONSE" | jq -r '.Token')
+if [[ "$TOKEN" == "null" || -z "$TOKEN" ]]; then
+  echo "Failed to extract token from login response"
+  echo "$LOGIN_RESPONSE"
+  exit 1
+fi
+
+echo "Login Successfull."
+
 # -----------------------
 # Start a datanode
 # -----------------------
@@ -57,7 +76,31 @@ echo "Starting $DATANODE_COUNT DataNodes..."
 for ((i = 0; i < DATANODE_COUNT; i++)); do
   grpc_port=$((3000 + i*10))
   tcp_port=$((3001 + i*10))
+  NODE_ID="datanode${i}"
+  echo "Requesting certificate for node '$NODE_ID'..."
+  CERT_RESPONSE=$(curl -s -X POST "$NAMENODE_URL/cert/issue" \
+    -H "jwt_token: $TOKEN" \
+    -H "auth_type: JwtTokenAuth" \
+    -H "Content-Type: application/json" \
+    -d "{\"node_id\": \"$NODE_ID\", \"node_type\":\"Datanode\"}")
 
+  CERT=$(echo "$CERT_RESPONSE" | jq -r '.cert')
+  if [[ "$CERT" == "null" || -z "$CERT" ]]; then
+   echo "Failed to extract cert from response"
+   echo "$CERT_RESPONSE"
+   continue
+  fi
+ echo "Certificate received "
+
+# ---- APPEND RAW CERT TO YAML CONFIG ----
+echo "Appending certificate"
+
+cat <<EOF >> "$(pwd)/cluster_configs/datanode/datanode${i}.yaml"
+
+namenode_cert: $(echo "$CERT" | sed 's/^/  /')
+EOF
+
+echo "Certificate appended successfully."
   docker run -d \
     --name gfs-datanode-$i \
     -p ${grpc_port}:3000 \
@@ -74,5 +117,31 @@ done
 
 echo "Cluster started with $DATANODE_COUNT datanodes."
 echo "Starting a client"
+echo "Getting cert for client"
+CERT_RESPONSE=$(curl -s -X POST "$NAMENODE_URL/cert/issue" \
+    -H "jwt_token: $TOKEN" \
+    -H "auth_type: JwtTokenAuth" \
+    -H "Content-Type: application/json" \
+    -d "{\"node_id\": \"Client\", \"node_type\":\"Client\"}")
+
+  CERT=$(echo "$CERT_RESPONSE" | jq -r '.cert')
+  if [[ "$CERT" == "null" || -z "$CERT" ]]; then
+   echo "Failed to extract cert from response"
+   echo "$CERT_RESPONSE"
+   continue
+  fi
+ echo "Certificate received "
+
+# ---- APPEND RAW CERT TO YAML CONFIG ----
+echo " Appending certificate"
+
+cat <<EOF >> "$(pwd)/client/config/default.yaml"
+
+namenode_cert: $(echo "$CERT" | sed 's/^/  /')
+EOF
+
+echo "Certificate appended successfully."
+
+
 export NAMENODE_ADDRS="http://host.docker.internal:7000"
 ENV=default RUST_LOG=client=trace,utilities=trace  APM_ENDPOINT=$APM_ENDPOINT cargo run -p client

@@ -2,7 +2,7 @@ mod delete_file_handler;
 mod fetch_file_handler;
 mod store_file_handler;
 
-use crate::{datanode_service::DatanodeService, namenode_service::NamenodeService};
+use crate::datanode_service::DatanodeService;
 use delete_file_handler::DeleteFileHandler;
 use fetch_file_handler::FetchFileHandler;
 use store_file_handler::StoreFileHandler;
@@ -14,7 +14,7 @@ pub struct CommandRunner {
     delete_file_handler: DeleteFileHandler,
 }
 impl CommandRunner {
-    pub fn new(namenode: NamenodeService) -> Self {
+    pub fn new(namenode: crate::namenode::service::NamenodeService) -> Self {
         CommandRunner {
             store_file_handler: StoreFileHandler::new(namenode.clone(), DatanodeService::new()),
             fetch_file_handler: FetchFileHandler::new(namenode.clone(), DatanodeService::new()),

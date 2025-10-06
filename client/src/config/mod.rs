@@ -12,6 +12,7 @@ pub struct Config {
     pub log_level: String,
     pub log_base: String,
     pub apm_endpoint: String,
+    pub namenode_cert: String,
 }
 
 pub static CONFIG: Lazy<Config> = Lazy::new(|| {

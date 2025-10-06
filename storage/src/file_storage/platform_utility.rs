@@ -21,7 +21,7 @@ pub(crate) async fn create_mount(
     if !config.create_mount {
         return Ok(None);
     }
-    // #[cfg(target_os = "linux")]
+    #[cfg(target_os = "linux")]
     {
         use std::process::Command;
 

@@ -7,4 +7,5 @@ log_base: /app/logs/
 state_log_file: /app/logs/state.log
 apm_endpoint: http://host.docker.internal:8200/v1/traces
 api_port: 8080
-api_jwt_sign_key: nothing to secure route is read only
+jwt_sign_key: nothing to secure route is read only
+certificate_dir: ./certificate

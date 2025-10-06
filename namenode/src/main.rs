@@ -1,8 +1,10 @@
 mod api_service;
+mod certificates;
 mod chunk_generator;
 mod client_handler;
 mod config;
 mod datanode;
+mod grpc;
 mod ledger;
 mod namenode_state;
 use client_handler::ClientHandler;
@@ -20,6 +22,8 @@ use utilities::logger::{error, info, init_logger};
 
 use crate::{
     api_service::rocket,
+    certificates::certificate_generator::CertificateAuthority,
+    grpc::auth::get_auth_intercepter_layer,
     namenode_state::{state_mantainer::StateMantainer, state_snapshot::SnapshotStore},
 };
 
@@ -50,17 +54,29 @@ async fn main() -> Result<(), Box<dyn Error>> {
             return Err(e);
         }
     };
+    let ca = match CertificateAuthority::new() {
+        Ok(c) => Arc::new(c),
+        Err(e) => {
+            error!("Error while creating a certificate authority {:}", e);
+            return Err(e);
+        }
+    };
+
     let state = Arc::new(Mutex::new(state_history));
     let snapshot_store = SnapshotStore::new();
     let state_mantainer = StateMantainer::new(state.clone(), snapshot_store.clone()).await;
     state_mantainer.start();
+    let rocket_ca = ca.clone();
     // starting API service
     tokio::spawn(async move {
-        info!("Starting a rocket server");
-        let _ = rocket(snapshot_store).launch().await;
+        info!("Starting : rocket server");
+        let result = rocket(snapshot_store, rocket_ca).launch().await;
+        error!("Rocket service has returned result : {:?}", result);
     });
-    // first we will start grpc server
+    info!("grpc server starting");
+    let root_cert = ca.get_root_cert().pem();
     Server::builder()
+        .layer(get_auth_intercepter_layer(&root_cert))
         .add_service(ClientNameNodeServer::new(ClientHandler::new(
             state.clone(),
             Box::new(ledger),
