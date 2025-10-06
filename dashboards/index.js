@@ -35,7 +35,7 @@ async function fetchSnapshot() {
 
   try {
     const res = await fetch("http://127.0.0.1:8080/monitoring/snapshot", {
-      headers: { "Authorization": token }
+      headers: { "auth_type":"JwtTokenAuth" ,jwt_token:token }
     });
     if (!res.ok) {
       console.error("Unauthorized or error fetching snapshot");

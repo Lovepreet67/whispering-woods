@@ -29,7 +29,9 @@ impl CertAuthenticator {
 impl Authenticator for CertAuthenticator {
     fn authenticate(&self, credentials: Credentials) -> Result<NodeMetadata, AuthenticationError> {
         if let Credentials::CertAuth { cert_pem } = credentials {
-            let cert_der = BASE64_STANDARD.decode(cert_pem).unwrap();
+            let cert_der = BASE64_STANDARD
+                .decode(cert_pem)
+                .map_err(|_| AuthenticationError::InvalidCredentials)?;
             let cert = EndEntityCert::try_from(&cert_der[..])
                 .map_err(|_| AuthenticationError::InvalidCredentials)?;
             let (_, x509) = X509Certificate::from_der(&cert_der).map_err(|_| {

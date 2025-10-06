@@ -5,14 +5,17 @@ use proto::generated::datanode_namenode::{
     datanode_namenode_client::DatanodeNamenodeClient,
 };
 use tokio::sync::Mutex;
-use tonic::transport::Channel;
 use utilities::{
     grpc_channel_pool::GRPC_CHANNEL_POOL,
-    logger::{error, info, instrument, trace, tracing},
+    logger::{error, instrument, trace, tracing},
     result::Result,
 };
 
-use crate::{config::CONFIG, datanode_state::DatanodeState};
+use crate::{
+    config::CONFIG, datanode_state::DatanodeState,
+    namenode::auth_intercepter::NamenodeAuthIntercepter,
+};
+use tonic::{service::interceptor::InterceptedService, transport::Channel};
 
 pub struct NamenodeService {
     state: Arc<Mutex<DatanodeState>>,
@@ -21,9 +24,15 @@ impl NamenodeService {
     pub fn new(state: Arc<Mutex<DatanodeState>>) -> Self {
         Self { state }
     }
-    async fn get_grpc_connection(&self, addrs: &str) -> Result<DatanodeNamenodeClient<Channel>> {
+    async fn get_grpc_connection(
+        &self,
+        addrs: &str,
+    ) -> Result<DatanodeNamenodeClient<InterceptedService<Channel, NamenodeAuthIntercepter>>> {
         let channel = GRPC_CHANNEL_POOL.get_channel(addrs).await.unwrap();
-        Ok(DatanodeNamenodeClient::new(channel))
+        Ok(DatanodeNamenodeClient::with_interceptor(
+            channel,
+            NamenodeAuthIntercepter,
+        ))
     }
     #[instrument(name = "service_namenode_connect", skip(self))]
     pub async fn connect(&self) -> Result<bool> {
