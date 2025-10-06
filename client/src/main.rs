@@ -1,6 +1,9 @@
 use std::{error::Error, io};
 
-use crate::config::CONFIG;
+use crate::{
+    config::CONFIG,
+    namenode::{auth_intercepter::NamenodeAuthIntercepter, service::NamenodeService},
+};
 use command_runner::CommandRunner;
 use proto::generated::client_namenode::client_name_node_client::ClientNameNodeClient;
 use utilities::{
@@ -12,7 +15,7 @@ mod command_runner;
 mod config;
 mod datanode_service;
 mod file_chunker;
-mod namenode_service;
+mod namenode;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     let _gaurd = logger::init_logger(
@@ -31,8 +34,10 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
             return Err(e);
         }
     };
-    let namenode =
-        namenode_service::NamenodeService::new(ClientNameNodeClient::new(namenode_channel));
+    let namenode = NamenodeService::new(ClientNameNodeClient::with_interceptor(
+        namenode_channel,
+        NamenodeAuthIntercepter,
+    ));
     let mut command_executer = CommandRunner::new(namenode);
     loop {
         let mut input = String::new();

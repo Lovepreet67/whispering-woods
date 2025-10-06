@@ -57,7 +57,7 @@ pub fn get_auth_intercepter_layer(
     root_cert_pem: &str,
 ) -> tonic::service::InterceptorLayer<AuthIntercepter> {
     let auth_manager = AuthManager::builder()
-        .upsert_no_auth_authenticator()
+        // .upsert_no_auth_authenticator()
         .upsert_jwt_token_authenticator(CONFIG.jwt_sign_key.clone())
         .upsert_cert_authenticator(root_cert_pem);
     tonic::service::InterceptorLayer::new(AuthIntercepter::new(auth_manager))

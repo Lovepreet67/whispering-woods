@@ -5,7 +5,8 @@ use utilities::{
 };
 
 use crate::{
-    datanode_service::DatanodeService, file_chunker::FileChunker, namenode_service::NamenodeService,
+    datanode_service::DatanodeService, file_chunker::FileChunker,
+    namenode::service::NamenodeService,
 };
 
 pub struct StoreFileHandler {

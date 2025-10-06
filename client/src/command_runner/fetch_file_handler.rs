@@ -5,7 +5,8 @@ use utilities::{
 };
 
 use crate::{
-    chunk_joiner::ChunkJoiner, datanode_service::DatanodeService, namenode_service::NamenodeService,
+    chunk_joiner::ChunkJoiner, datanode_service::DatanodeService,
+    namenode::service::NamenodeService,
 };
 
 pub struct FetchFileHandler {
