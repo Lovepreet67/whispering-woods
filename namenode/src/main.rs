@@ -15,10 +15,13 @@ use proto::generated::{
     client_namenode::client_name_node_server::ClientNameNodeServer,
     datanode_namenode::datanode_namenode_server::DatanodeNamenodeServer,
 };
-use std::{error::Error, sync::Arc};
+use std::sync::Arc;
 use tokio::sync::Mutex;
 use tonic::transport::Server;
-use utilities::logger::{error, info, init_logger};
+use utilities::{
+    logger::{error, info, init_logger},
+    result::Result,
+};
 
 use crate::{
     api_service::rocket,
@@ -28,7 +31,7 @@ use crate::{
 };
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
+async fn main() -> Result<()> {
     let _gaurd = init_logger(
         "Namenode",
         &CONFIG.id,
@@ -47,7 +50,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             return Err(e);
         }
     };
-    let state_history = match ledger.replay() {
+    let (state_history, ticket_mint) = match ledger.replay() {
         Ok(v) => v,
         Err(e) => {
             error!(error=%e,"Error while reading the logs from ledger Hence shuting down");
@@ -65,12 +68,22 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let state = Arc::new(Mutex::new(state_history));
     let snapshot_store = SnapshotStore::new();
     let state_mantainer = StateMantainer::new(state.clone(), snapshot_store.clone()).await;
+    // ticket generating mechanism
+    let ticket_mint_thrd_safe = Arc::new(Mutex::new(ticket_mint));
     state_mantainer.start();
     let rocket_ca = ca.clone();
     // starting API service
+    let rocket_ledger = ledger.clone();
     tokio::spawn(async move {
         info!("Starting : rocket server");
-        let result = rocket(snapshot_store, rocket_ca).launch().await;
+        let result = rocket(
+            snapshot_store,
+            rocket_ca,
+            ticket_mint_thrd_safe,
+            Box::new(rocket_ledger),
+        )
+        .launch()
+        .await;
         error!("Rocket service has returned result : {:?}", result);
     });
     info!("grpc server starting");
