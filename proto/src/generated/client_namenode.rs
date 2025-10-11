@@ -18,6 +18,8 @@ pub struct ChunkMeta {
     pub end_offset: u64,
     #[prost(message, repeated, tag = "4")]
     pub location: ::prost::alloc::vec::Vec<DataNodeMeta>,
+    #[prost(string, tag = "5")]
+    pub ticket: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FetchFileRequest {

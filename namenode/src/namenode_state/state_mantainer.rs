@@ -14,6 +14,7 @@ use crate::namenode_state::chunk_details::ChunkReplicationStatus;
 use crate::namenode_state::state_snapshot::{NamenodeStateSnapshot, SnapshotStore};
 use std::path;
 use utilities::state_logger;
+use utilities::ticket::ticket_mint::TicketMint;
 
 /// To mantain the state of the namenode based on the heartbeat
 pub struct StateMantainer {
@@ -28,6 +29,7 @@ impl StateMantainer {
     pub async fn new(
         namenode_state: Arc<Mutex<NamenodeState>>,
         snapshot_store: SnapshotStore,
+        ticket_mint: Arc<Mutex<TicketMint>>,
     ) -> Self {
         let tx = state_logger::StateLogger::<NamenodeStateSnapshot, _>::start(
             NamenodeState::default(),
@@ -42,7 +44,7 @@ impl StateMantainer {
         .map_err(|e| format!("Error while creating a state logger {e}"))
         .unwrap();
         Self {
-            datanode_service: DatanodeService::default(),
+            datanode_service: DatanodeService::new(ticket_mint),
             datanode_selection_policy: Arc::new(Mutex::new(Box::new(
                 DefaultDatanodeSelectionPolicy::new(namenode_state.clone()),
             ))),
@@ -53,7 +55,7 @@ impl StateMantainer {
     }
     // this function is fire and forget
     fn handle_undereplicated_chunk(&self, chunk_id: &str) {
-        let datanode_service = self.datanode_service;
+        let datanode_service = self.datanode_service.clone();
         let datanode_selection_policy = self.datanode_selection_policy.clone();
         let chunk_id = chunk_id.to_owned();
 
@@ -82,7 +84,7 @@ impl StateMantainer {
     fn handler_overreplicated_chunk(&self, chunk_id: &str, count: u8) {
         let chunk_id = chunk_id.to_owned();
         let datanode_selection_policy = self.datanode_selection_policy.clone();
-        let datanode_service = self.datanode_service;
+        let datanode_service = self.datanode_service.clone();
         tokio::spawn(async move {
             let datanode_selection_policy = datanode_selection_policy.lock().await;
             let datanodes_to_offload = match datanode_selection_policy

@@ -4,19 +4,24 @@ use proto::generated::{
         DeleteChunkRequest, ReplicateChunkRequest, namenode_datanode_client::NamenodeDatanodeClient,
     },
 };
+use std::sync::Arc;
+use tokio::sync::Mutex;
 use tonic::transport::Channel;
 use utilities::{
     grpc_channel_pool::GRPC_CHANNEL_POOL,
     logger::{instrument, tracing},
     result::Result,
+    ticket::ticket_mint::TicketMint,
 };
 
-#[derive(Clone, Copy, Default, Debug)]
-pub struct DatanodeService {}
+#[derive(Clone)]
+pub struct DatanodeService {
+    ticket_mint: Arc<Mutex<TicketMint>>,
+}
 
 impl DatanodeService {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(ticket_mint: Arc<Mutex<TicketMint>>) -> Self {
+        Self { ticket_mint }
     }
     async fn get_connection(addrs: &str) -> Result<NamenodeDatanodeClient<Channel>> {
         let channel = GRPC_CHANNEL_POOL.get_channel(addrs).await.unwrap();
@@ -40,9 +45,17 @@ impl DatanodeService {
         target_datanode_meta: DataNodeMeta,
         chunk_id: &str,
     ) -> Result<()> {
+        let ticket = self.ticket_mint.lock().await.mint_ticket(
+            &source_datanode_meta.id,
+            &target_datanode_meta.id,
+            utilities::ticket::types::Operation::StoreChunk {
+                chunk_id: chunk_id.to_string(),
+            },
+        )?;
         let request = ReplicateChunkRequest {
             target_data_node: target_datanode_meta.addrs,
             chunk_id: chunk_id.to_owned(),
+            ticket,
         };
         let source_address = source_datanode_meta.addrs;
         let _ = Self::get_connection(&source_address)

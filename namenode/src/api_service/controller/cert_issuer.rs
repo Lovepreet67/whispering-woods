@@ -46,7 +46,7 @@ pub async fn issue_cert(
         }
     };
     let mut tm_locked = tm.lock().await;
-    let key = match tm_locked.add_node_key(&node_meta.0.id) {
+    let key = match tm_locked.add_node_key(&req.node_id) {
         Ok(v) => v,
         Err(e) => {
             println!("{}", e);

@@ -7,20 +7,24 @@ use tokio::io::{AsyncWriteExt, copy};
 use utilities::{
     logger::{error, instrument, tracing},
     tcp_pool::TCP_CONNECTION_POOL,
+    ticket::ticket_decrypter::TicketDecrypter,
 };
 
 use crate::peer::service::PeerService;
+use std::sync::Arc;
 
 pub struct NamenodeHandler {
     store: FileStorage,
     peer_service: PeerService,
+    ticket_decrypter: Arc<Box<dyn TicketDecrypter>>,
 }
 
 impl NamenodeHandler {
-    pub fn new(store: FileStorage) -> Self {
+    pub fn new(store: FileStorage, ticket_decrypter: Arc<Box<dyn TicketDecrypter>>) -> Self {
         Self {
             store,
             peer_service: PeerService::default(),
+            ticket_decrypter,
         }
     }
     async fn transfer_chunk_content(
@@ -67,10 +71,23 @@ impl NamenodeDatanode for NamenodeHandler {
     ) -> Result<tonic::Response<ReplicateChunkResponse>, tonic::Status> {
         let replicate_chunk_request = request.into_inner();
         let chunk_id = replicate_chunk_request.chunk_id;
+        let client_ticket = self
+            .ticket_decrypter
+            .decrypt_client_ticket(&replicate_chunk_request.ticket)
+            .map_err(|e| {
+                tonic::Status::new(
+                    tonic::Code::InvalidArgument,
+                    format!("Error while decrypting the ticket {:?}", e),
+                )
+            })?;
         // first we will send the grpc call
         let target_tcp_address = match self
             .peer_service
-            .store_chunk(&chunk_id, &replicate_chunk_request.target_data_node)
+            .store_chunk(
+                &chunk_id,
+                &replicate_chunk_request.target_data_node,
+                &client_ticket.encrypted_server_ticket,
+            )
             .await
         {
             Ok(addrs) => addrs,
@@ -92,7 +109,11 @@ impl NamenodeDatanode for NamenodeHandler {
         // next we will send commit chunk Request
         match self
             .peer_service
-            .commit_chunk(&chunk_id, &replicate_chunk_request.target_data_node)
+            .commit_chunk(
+                &chunk_id,
+                &replicate_chunk_request.target_data_node,
+                &client_ticket.encrypted_server_ticket,
+            )
             .await
         {
             Ok(_) => {}

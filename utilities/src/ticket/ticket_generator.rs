@@ -5,6 +5,7 @@ use aes_gcm::{AeadCore, Aes256Gcm, Key, KeyInit};
 use base64::Engine;
 use base64::prelude::BASE64_STANDARD;
 use std::collections::HashMap;
+use tracing::{debug, info};
 
 pub trait TicketGenerator {
     fn upsert_node_key(&mut self, node_id: &str) -> Result<String>;
@@ -24,22 +25,20 @@ impl DefaultTicketGenerator {
         }
     }
     fn encrypt_with_node_key(&mut self, encoded_ticket: Vec<u8>, node_id: &str) -> Result<Vec<u8>> {
+        debug!("encrypting the ticket : {:?}", self.node_to_key);
         if let Some(node_key) = self.node_to_key.get(node_id) {
             let cipher = Aes256Gcm::new(node_key);
             let nonce = Aes256Gcm::generate_nonce(&mut OsRng); // 96-bits; unique per message
             match cipher.encrypt(&nonce, encoded_ticket.as_ref()) {
                 Ok(mut v) => {
-                    v.append(&mut nonce.to_vec());
-                    Ok(v)
+                    let mut merged = nonce.to_vec();
+                    merged.append(&mut v);
+                    Ok(merged)
                 }
-                Err(_e) => {
-                    println!("Error occured");
-                    println!("{:?}", _e);
-                    Err("Error while encrypting the data".into())
-                }
+                Err(_e) => Err("Error while encrypting the data".into()),
             }
         } else {
-            Err("Invalid node id in in server ticket".into())
+            Err("Invalid node id in server ticket".into())
         }
     }
 }

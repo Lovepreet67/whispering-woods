@@ -1,4 +1,4 @@
-use std::{error::Error, io};
+use std::{error::Error, io, sync::Arc};
 
 use crate::{
     config::CONFIG,
@@ -9,6 +9,7 @@ use proto::generated::client_namenode::client_name_node_client::ClientNameNodeCl
 use utilities::{
     grpc_channel_pool::GRPC_CHANNEL_POOL,
     logger::{self, error, info},
+    ticket::ticket_decrypter::{self, DefaultTicketDecrypter, TicketDecrypter},
 };
 mod chunk_joiner;
 mod command_runner;
@@ -38,7 +39,10 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         namenode_channel,
         NamenodeAuthIntercepter,
     ));
-    let mut command_executer = CommandRunner::new(namenode);
+    // ticket decrypter
+    let ticket_decrypter: Arc<Box<dyn TicketDecrypter>> =
+        Arc::new(Box::new(DefaultTicketDecrypter::new(&CONFIG.secret_key)?));
+    let mut command_executer = CommandRunner::new(namenode, ticket_decrypter);
     loop {
         let mut input = String::new();
         match io::stdin().read_line(&mut input) {

@@ -38,7 +38,7 @@ docker run -d \
   -p 7000:7000 \
   -p 8080:8080 \
   -e ENV=$ENV \
-  -e RUST_LOG=namenode=trace \
+  -e RUST_LOG=namenode=trace,utilities=trace \
   -e CONFIG_PATH="./container.yaml" \
   -v "$(pwd)/namenode/config/container.yaml":/app/container.yaml \
   --name gfs-namenode \
@@ -76,7 +76,7 @@ echo "Starting $DATANODE_COUNT DataNodes..."
 for ((i = 0; i < DATANODE_COUNT; i++)); do
   grpc_port=$((3000 + i*10))
   tcp_port=$((3001 + i*10))
-  NODE_ID="datanode${i}"
+  NODE_ID="datanode_${i+1}"
   echo "Requesting certificate for node '$NODE_ID'..."
   CERT_RESPONSE=$(curl -s -X POST "$NAMENODE_URL/cert/issue" \
     -H "jwt_token: $TOKEN" \
@@ -85,6 +85,7 @@ for ((i = 0; i < DATANODE_COUNT; i++)); do
     -d "{\"node_id\": \"$NODE_ID\", \"node_type\":\"Datanode\"}")
 
   CERT=$(echo "$CERT_RESPONSE" | jq -r '.cert')
+  SECKEY=$(echo "$CERT_RESPONSE" | jq -r '.key')
   if [[ "$CERT" == "null" || -z "$CERT" ]]; then
    echo "Failed to extract cert from response"
    echo "$CERT_RESPONSE"
@@ -96,8 +97,8 @@ for ((i = 0; i < DATANODE_COUNT; i++)); do
 echo "Appending certificate"
 
 cat <<EOF >> "$(pwd)/cluster_configs/datanode/datanode${i}.yaml"
-
 namenode_cert: $(echo "$CERT" | sed 's/^/  /')
+secret_key: $(echo "$SECKEY" | sed 's/^/  /')
 EOF
 
 echo "Certificate appended successfully."
@@ -122,9 +123,11 @@ CERT_RESPONSE=$(curl -s -X POST "$NAMENODE_URL/cert/issue" \
     -H "jwt_token: $TOKEN" \
     -H "auth_type: JwtTokenAuth" \
     -H "Content-Type: application/json" \
-    -d "{\"node_id\": \"Client\", \"node_type\":\"Client\"}")
+    -d "{\"node_id\": \"client_0\", \"node_type\":\"Client\"}")
 
   CERT=$(echo "$CERT_RESPONSE" | jq -r '.cert')
+  SECKEY=$(echo "$CERT_RESPONSE" | jq -r '.key')
+
   if [[ "$CERT" == "null" || -z "$CERT" ]]; then
    echo "Failed to extract cert from response"
    echo "$CERT_RESPONSE"
@@ -136,8 +139,8 @@ CERT_RESPONSE=$(curl -s -X POST "$NAMENODE_URL/cert/issue" \
 echo " Appending certificate"
 
 cat <<EOF >> "$(pwd)/client/config/default.yaml"
-
 namenode_cert: $(echo "$CERT" | sed 's/^/  /')
+secret_key: $(echo "$SECKEY" | sed 's/^/  /')
 EOF
 
 echo "Certificate appended successfully."

@@ -1,6 +1,7 @@
 mod client;
 mod config;
 mod datanode_state;
+mod grpc;
 mod namenode;
 mod peer;
 mod state_mantainer;
@@ -14,19 +15,23 @@ use proto::generated::client_datanode::client_data_node_server::ClientDataNodeSe
 use proto::generated::datanode_datanode::peer_server::PeerServer;
 use proto::generated::namenode_datanode::namenode_datanode_server::NamenodeDatanodeServer;
 use state_mantainer::StateMantainer;
-use std::error::Error;
 use std::sync::Arc;
 use std::time::Duration;
 use storage::file_storage;
 use tokio::sync::Mutex;
 use tokio::time::sleep;
 use tonic::transport::Server;
-use utilities::logger::{error, info, init_logger, trace};
+use utilities::result::Result;
+use utilities::{
+    logger::{error, info, init_logger, trace},
+    ticket::ticket_decrypter::{DefaultTicketDecrypter, TicketDecrypter},
+};
 
 use crate::config::CONFIG;
+use crate::grpc::ticket::TicketIntercepter;
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
+async fn main() -> Result<()> {
     let _gaurd = init_logger(
         "Datanode",
         &CONFIG.datanode_id,
@@ -41,15 +46,23 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let state = Arc::new(Mutex::new(DatanodeState::new()));
     info!(storage_path = %CONFIG.storage_config.storage_path, "Creating storage");
     let store = file_storage::FileStorage::new(CONFIG.storage_config.clone().into()).await;
-    let ch = ClientHandler::new(state.clone(), store.clone());
-    let ph = peer::handler::PeerHandler::new(state.clone(), store.clone());
+    let ticket_decrypter: Arc<Box<dyn TicketDecrypter>> =
+        Arc::new(Box::new(DefaultTicketDecrypter::new(&CONFIG.secret_key)?));
+    let ch = ClientHandler::new(state.clone(), store.clone(), ticket_decrypter.clone());
+    let ph =
+        peer::handler::PeerHandler::new(state.clone(), store.clone(), ticket_decrypter.clone());
+    let ticket_intercepter = TicketIntercepter::new(ticket_decrypter.clone());
     // first we will start grpc server
     info!(grpc_addr = %CONFIG.external_grpc_addrs,"Creating grpc server");
     let grpc_server = Server::builder()
-        .add_service(ClientDataNodeServer::new(ch))
-        .add_service(PeerServer::new(ph))
+        .add_service(ClientDataNodeServer::with_interceptor(
+            ch,
+            ticket_intercepter.clone(),
+        ))
+        .add_service(PeerServer::with_interceptor(ph, ticket_intercepter.clone()))
         .add_service(NamenodeDatanodeServer::new(NamenodeHandler::new(
             store.clone(),
+            ticket_decrypter,
         )))
         .serve(format!("0.0.0.0:{}", CONFIG.internal_grpc_port).parse()?);
     tokio::spawn(grpc_server);

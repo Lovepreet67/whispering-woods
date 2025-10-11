@@ -9,21 +9,33 @@ use tokio::{net::TcpStream, sync::Mutex};
 use utilities::{
     logger::{error, instrument, trace, tracing},
     result::Result,
+    ticket::ticket_decrypter::{self, TicketDecrypter},
 };
 
-use crate::{config::CONFIG, datanode_state::DatanodeState, peer::service::PeerService};
+use crate::{
+    config::CONFIG, datanode_state::DatanodeState, namenode::service::NamenodeService,
+    peer::service::PeerService,
+};
 pub struct PeerHandler {
     state: Arc<Mutex<DatanodeState>>,
     peer_service: PeerService,
+    namenode_service: NamenodeService,
     store: FileStorage,
+    ticket_decrypter: Arc<Box<dyn TicketDecrypter>>,
 }
 
 impl PeerHandler {
-    pub fn new(state: Arc<Mutex<DatanodeState>>, store: FileStorage) -> Self {
+    pub fn new(
+        state: Arc<Mutex<DatanodeState>>,
+        store: FileStorage,
+        ticket_decrypter: Arc<Box<dyn TicketDecrypter>>,
+    ) -> Self {
         Self {
+            namenode_service: NamenodeService::new(state.clone()),
             state,
             peer_service: PeerService::new(),
             store,
+            ticket_decrypter,
         }
     }
     async fn get_tcp_connection(&self, addrs: &str) -> Result<TcpStream> {
@@ -48,11 +60,24 @@ impl Peer for PeerHandler {
         // first we will send the create pipeling request to the next replica
         if create_pipeline_request.replica_set.len() > 1 {
             trace!(replica_set = ?create_pipeline_request.replica_set,"Passing create pipeline request to next");
+            let ticket = self
+                .namenode_service
+                .get_store_chunk_ticket(
+                    &create_pipeline_request.replica_set[1].id,
+                    &create_pipeline_request.chunk_id,
+                )
+                .await
+                .unwrap();
+            let client_ticket = self
+                .ticket_decrypter
+                .decrypt_client_ticket(&ticket)
+                .unwrap();
             let tcp_address = match self
                 .peer_service
                 .create_pipeline(
                     &create_pipeline_request.chunk_id,
                     &create_pipeline_request.replica_set[1..],
+                    &client_ticket.encrypted_server_ticket,
                 )
                 .await
             {
@@ -80,6 +105,10 @@ impl Peer for PeerHandler {
             state.chunk_to_next_replica.insert(
                 create_pipeline_request.chunk_id.clone(),
                 create_pipeline_request.replica_set[1].addrs.clone(),
+            );
+            state.chunk_to_namenode_store_ticket.insert(
+                create_pipeline_request.chunk_id.clone(),
+                client_ticket.encrypted_server_ticket,
             );
         }
         let response = CreatePipelineResponse {
@@ -109,12 +138,20 @@ impl Peer for PeerHandler {
             .chunk_to_next_replica
             .remove(&commit_chunk_request.chunk_id)
         {
+            let ticket = state
+                .chunk_to_namenode_store_ticket
+                .remove(&commit_chunk_request.chunk_id)
+                .unwrap();
             trace!("have next replica so transferring commit message");
             drop(state); // droping state to remove lock
             //send commit message to next_replica_node_grpc
             let _committed = match self
                 .peer_service
-                .commit_chunk(&commit_chunk_request.chunk_id, &next_replica_node_grpc)
+                .commit_chunk(
+                    &commit_chunk_request.chunk_id,
+                    &next_replica_node_grpc,
+                    &ticket,
+                )
                 .await
             {
                 Ok(v) => v,

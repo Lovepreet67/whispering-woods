@@ -6,7 +6,11 @@ use proto::generated::client_namenode::{
 };
 use tokio::sync::Mutex;
 use tonic::Code;
-use utilities::logger::{instrument, trace, tracing};
+use utilities::{
+    auth::types::NodeMetadata,
+    logger::{instrument, trace, tracing},
+    ticket::ticket_mint::TicketMint,
+};
 
 use crate::{
     chunk_generator::{ChunkGenerator, DefaultChunkGenerator},
@@ -23,9 +27,14 @@ pub struct ClientHandler {
     datanode_selector: Box<dyn DatanodeSelectionPolicy + Send + Sync>,
     chunk_generator: Box<dyn ChunkGenerator + Send + Sync>,
     ledger: Box<dyn Ledger + Send + Sync>,
+    ticket_mint: Arc<Mutex<TicketMint>>,
 }
 impl ClientHandler {
-    pub fn new(state: Arc<Mutex<NamenodeState>>, ledger: Box<dyn Ledger + Send + Sync>) -> Self {
+    pub fn new(
+        state: Arc<Mutex<NamenodeState>>,
+        ledger: Box<dyn Ledger + Send + Sync>,
+        ticket_mint: Arc<Mutex<TicketMint>>,
+    ) -> Self {
         let datanode_selection_policy =
             Box::new(DefaultDatanodeSelectionPolicy::new(state.clone()));
         let chunk_generator = Box::new(DefaultChunkGenerator::new((64 * 1024 * 1024) as u64));
@@ -34,6 +43,7 @@ impl ClientHandler {
             datanode_selector: datanode_selection_policy,
             chunk_generator,
             ledger,
+            ticket_mint,
         }
     }
 }
@@ -44,6 +54,8 @@ impl ClientNameNode for ClientHandler {
         &self,
         request: tonic::Request<StoreFileRequest>,
     ) -> Result<tonic::Response<StoreFileResponse>, tonic::Status> {
+        let node_meta = request.extensions().get::<NodeMetadata>().unwrap(); // node meta will be always
+        // there
         let store_file_request = request.get_ref();
         let chunk_details = self
             .chunk_generator
@@ -53,6 +65,7 @@ impl ClientNameNode for ClientHandler {
             .store_file(&store_file_request.file_name, chunk_details.len() as u64)
             .await;
         let mut chunk_meta = vec![];
+        let mut tm = self.ticket_mint.lock().await;
         for (index, chunk) in chunk_details.iter().enumerate() {
             self.ledger
                 .store_chunk(
@@ -68,10 +81,21 @@ impl ClientNameNode for ClientHandler {
                 .get_datanodes_to_store(chunk.end_offset - chunk.start_offset)
                 .await
                 .map_err(|e| tonic::Status::internal(format!("{e}")))?;
+            let ticket = tm
+                .mint_ticket(
+                    &node_meta.id,
+                    &location[0].id,
+                    utilities::ticket::types::Operation::StoreChunk {
+                        chunk_id: chunk.id.to_string(),
+                    },
+                )
+                .map_err(|e| tonic::Status::internal(format!("{e}")))?;
+
             chunk_meta.push(ChunkMeta {
                 id: chunk.id.clone(),
                 start_offset: chunk.start_offset,
                 end_offset: chunk.end_offset,
+                ticket,
                 location,
             });
         }
@@ -97,11 +121,13 @@ impl ClientNameNode for ClientHandler {
         &self,
         request: tonic::Request<FetchFileRequest>,
     ) -> Result<tonic::Response<FetchFileResponse>, tonic::Status> {
+        let node_meta = request.extensions().get::<NodeMetadata>().unwrap(); // node meta will be always
         let fetch_file_request = request.get_ref();
         //TODO: find something better than cloning state
         //if we don't clone here this becomes deadlock when we can function get_datanodes_to_serve
         //which also uses state may be reader writer locak will help
         let state = self.state.lock().await.clone();
+        let mut tm = self.ticket_mint.lock().await;
         if let Some(chunks) = state.file_to_chunk_map.get(&fetch_file_request.file_name) {
             let mut chunk_list: Vec<ChunkMeta> = vec![];
             for chunk in chunks {
@@ -117,11 +143,22 @@ impl ClientNameNode for ClientHandler {
                         return Err(tonic::Status::not_found("Error while geting chunk meta"));
                     }
                 };
+                let ticket = tm
+                    .mint_ticket(
+                        &node_meta.id,
+                        &location.id,
+                        utilities::ticket::types::Operation::StoreChunk {
+                            chunk_id: chunk.to_string(),
+                        },
+                    )
+                    .map_err(|e| tonic::Status::internal(format!("{e}")))?;
+
                 chunk_list.push(ChunkMeta {
                     id: chunk.to_string(),
                     location: vec![location],
                     start_offset: chunk_details.start_offset,
                     end_offset: chunk_details.end_offset,
+                    ticket,
                 });
             }
             trace!(chunk_list = ?chunk_list,"fetch file request Handled");

@@ -1,23 +1,32 @@
 use std::sync::Arc;
 
 use tokio::sync::Mutex;
-use utilities::logger::{instrument, tracing};
+use utilities::{
+    logger::{instrument, tracing},
+    ticket::ticket_mint::TicketMint,
+};
 
 use crate::namenode_state::NamenodeState;
 use crate::namenode_state::datanode_details::DatanodeDetail;
 
 use proto::generated::datanode_namenode::{
     ConnectionRequest, ConnectionResponse, HeartBeatRequest, HeartBeatResponse, StateSyncRequest,
-    StateSyncResponse, datanode_namenode_server::DatanodeNamenode,
+    StateSyncResponse, StoreChunkTicketRequest, StoreChunkTicketResponse,
+    datanode_namenode_server::DatanodeNamenode,
 };
 
 pub struct DatanodeHandler {
     state: Arc<Mutex<NamenodeState>>,
+    ticket_mint: Arc<Mutex<TicketMint>>,
 }
 impl DatanodeHandler {
-    pub fn new(namenode_state: Arc<Mutex<NamenodeState>>) -> Self {
+    pub fn new(
+        namenode_state: Arc<Mutex<NamenodeState>>,
+        ticket_mint: Arc<Mutex<TicketMint>>,
+    ) -> Self {
         Self {
             state: namenode_state,
+            ticket_mint,
         }
     }
 }
@@ -127,5 +136,29 @@ impl DatanodeNamenode for DatanodeHandler {
             chunks_to_be_deleted,
         };
         Ok(tonic::Response::new(response))
+    }
+    #[instrument(name="grpc_datanode_store_chunk_ticket",skip(self,request),fields(datanode_id= %request.get_ref().source_id,target_id = %request.get_ref().target_id, chunk_id = %request.get_ref().chunk_id))]
+    async fn store_chunk_ticket(
+        &self,
+        request: tonic::Request<StoreChunkTicketRequest>,
+    ) -> Result<tonic::Response<StoreChunkTicketResponse>, tonic::Status> {
+        let mut tm = self.ticket_mint.lock().await;
+        let store_chunk_request = request.get_ref();
+        let ticket = tm
+            .mint_ticket(
+                &store_chunk_request.source_id,
+                &store_chunk_request.target_id,
+                utilities::ticket::types::Operation::CreatePipeline {
+                    chunk_id: store_chunk_request.chunk_id.to_string(),
+                },
+            )
+            .map_err(|e| {
+                tonic::Status::new(
+                    tonic::Code::Internal,
+                    format!("Error while generating the ticket {e}"),
+                )
+            })?;
+        let pipeline_response = StoreChunkTicketResponse { ticket };
+        Ok(tonic::Response::new(pipeline_response))
     }
 }

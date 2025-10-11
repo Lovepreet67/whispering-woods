@@ -67,19 +67,27 @@ async fn main() -> Result<()> {
 
     let state = Arc::new(Mutex::new(state_history));
     let snapshot_store = SnapshotStore::new();
-    let state_mantainer = StateMantainer::new(state.clone(), snapshot_store.clone()).await;
     // ticket generating mechanism
+
     let ticket_mint_thrd_safe = Arc::new(Mutex::new(ticket_mint));
+
+    let state_mantainer = StateMantainer::new(
+        state.clone(),
+        snapshot_store.clone(),
+        ticket_mint_thrd_safe.clone(),
+    )
+    .await;
     state_mantainer.start();
     let rocket_ca = ca.clone();
     // starting API service
     let rocket_ledger = ledger.clone();
+    let rocket_ticket_mint = ticket_mint_thrd_safe.clone();
     tokio::spawn(async move {
         info!("Starting : rocket server");
         let result = rocket(
             snapshot_store,
             rocket_ca,
-            ticket_mint_thrd_safe,
+            rocket_ticket_mint,
             Box::new(rocket_ledger),
         )
         .launch()
@@ -93,9 +101,11 @@ async fn main() -> Result<()> {
         .add_service(ClientNameNodeServer::new(ClientHandler::new(
             state.clone(),
             Box::new(ledger),
+            ticket_mint_thrd_safe.clone(),
         )))
         .add_service(DatanodeNamenodeServer::new(DatanodeHandler::new(
             state.clone(),
+            ticket_mint_thrd_safe.clone(),
         )))
         .serve(format!("0.0.0.0:{}", CONFIG.internal_grpc_port).parse()?)
         .await?;

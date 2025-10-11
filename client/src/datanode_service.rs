@@ -5,8 +5,9 @@ use proto::generated::{
     },
     client_namenode::DataNodeMeta,
 };
+use std::str::FromStr;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
-use tonic::transport::Channel;
+use tonic::{metadata::MetadataValue, transport::Channel};
 use utilities::{
     grpc_channel_pool::GRPC_CHANNEL_POOL,
     logger::{error, instrument, trace, tracing},
@@ -30,20 +31,24 @@ impl DatanodeService {
         chunk_id: String,
         chunk_size: u64,
         replica_set: Vec<DataNodeMeta>,
+        ticket: String,
         mut read_stream: (impl AsyncRead + Unpin),
     ) -> Result<()> {
         if replica_set.is_empty() {
             return Err("Empty replica set".into());
         }
-        let store_chunk_request = StoreChunkRequest {
+        let mut store_chunk_request = tonic::Request::new(StoreChunkRequest {
             chunk_id: chunk_id.clone(),
             replica_set: replica_set.clone(),
-        };
+        });
+        store_chunk_request
+            .metadata_mut()
+            .insert("ticket", MetadataValue::from_str(&ticket)?);
         let mut data_node_grpc_client = self.get_grpc_connection(&replica_set[0].addrs).await?;
         // getting tcp address for the first replica set to which we will stream the read stream
         trace!("Sending store chunk request");
         let store_chunk_response = data_node_grpc_client
-            .store_chunk(tonic::Request::new(store_chunk_request))
+            .store_chunk(store_chunk_request)
             .await?;
         let tcp_addrs = &store_chunk_response.get_ref().address;
         trace!(%tcp_addrs,"Got tcp address");
@@ -67,9 +72,12 @@ impl DatanodeService {
             return Err("Bytes recieved are diffrent from bytes written".into());
         }
         trace!("Sending commit message");
-        let commit_chunk_request = CommitChunkRequest { chunk_id };
+        let mut commit_chunk_request = tonic::Request::new(CommitChunkRequest { chunk_id });
+        commit_chunk_request
+            .metadata_mut()
+            .insert("ticket", MetadataValue::from_str(&ticket)?);
         data_node_grpc_client
-            .commit_chunk(tonic::Request::new(commit_chunk_request))
+            .commit_chunk(commit_chunk_request)
             .await?;
         trace!("committed successfully");
         Ok(())
@@ -79,15 +87,19 @@ impl DatanodeService {
         &self,
         chunk_id: String,
         datanode_addrs: String,
+        ticket: String,
     ) -> Result<impl AsyncRead + Unpin + Send + Sync> {
-        let fetch_chunk_request = FetchChunkRequest {
+        let mut fetch_chunk_request = tonic::Request::new(FetchChunkRequest {
             chunk_id: chunk_id.clone(),
-        };
+        });
+        fetch_chunk_request
+            .metadata_mut()
+            .insert("ticket", MetadataValue::from_str(&ticket)?);
         let mut data_node_grpc_client = self.get_grpc_connection(&datanode_addrs).await?;
         // getting tcp address for the first replica set to which we will stream the read stream
         trace!("Sending fetch chunk request");
         let fetch_chunk_response = data_node_grpc_client
-            .fetch_chunk(tonic::Request::new(fetch_chunk_request))
+            .fetch_chunk(fetch_chunk_request)
             .await?
             .into_inner();
         trace!(tcp_addrs = %fetch_chunk_response.address,"Got tcp stream addres for datanode");

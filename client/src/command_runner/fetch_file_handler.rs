@@ -2,20 +2,31 @@ use utilities::{
     logger::{Instrument, error, info, instrument, trace, tracing},
     result::Result,
     retry_policy::retry_with_backoff,
+    ticket::ticket_decrypter::TicketDecrypter,
 };
 
 use crate::{
     chunk_joiner::ChunkJoiner, datanode_service::DatanodeService,
     namenode::service::NamenodeService,
 };
+use std::sync::Arc;
 
 pub struct FetchFileHandler {
     namenode: NamenodeService,
     datanode: DatanodeService,
+    ticket_decrypter: Arc<Box<dyn TicketDecrypter>>,
 }
 impl FetchFileHandler {
-    pub fn new(namenode: NamenodeService, datanode: DatanodeService) -> Self {
-        Self { namenode, datanode }
+    pub fn new(
+        namenode: NamenodeService,
+        datanode: DatanodeService,
+        ticket_decrypter: Arc<Box<dyn TicketDecrypter>>,
+    ) -> Self {
+        Self {
+            namenode,
+            datanode,
+            ticket_decrypter,
+        }
     }
     #[instrument(skip(self))]
     pub async fn fetch_file(
@@ -37,6 +48,10 @@ impl FetchFileHandler {
             let chunk_joiner = chunk_joiner.clone();
             let datanode = self.datanode.clone();
             let chunk_detail = chunk_detail.clone();
+            let server_ticket = self
+                .ticket_decrypter
+                .decrypt_client_ticket(&chunk_detail.ticket)?
+                .encrypted_server_ticket;
             handles.push(tokio::spawn(
                 async move {
                     retry_with_backoff(
@@ -45,6 +60,7 @@ impl FetchFileHandler {
                                 .fetch_chunk(
                                     chunk_detail.id.clone(),
                                     chunk_detail.location[0].addrs.clone(),
+                                    server_ticket.clone(),
                                 )
                                 .await;
                             match fetch_chunk_result {

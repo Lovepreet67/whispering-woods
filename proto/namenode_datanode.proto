@@ -10,6 +10,7 @@ service NamenodeDatanode {
 message ReplicateChunkRequest {
   string targetDataNode = 1;
   string chunkId = 2;
+  string ticket=3;
 }
 message ReplicateChunkResponse {
 }

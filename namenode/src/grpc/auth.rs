@@ -1,7 +1,7 @@
 use crate::config::CONFIG;
 use std::collections::HashMap;
 use tonic::service::Interceptor;
-use utilities::auth::AuthManager;
+use utilities::{auth::AuthManager, logger::trace};
 
 #[derive(Clone, Debug)]
 pub struct AuthIntercepter {
@@ -29,8 +29,7 @@ impl Interceptor for AuthIntercepter {
             });
         match self.auth_manager.authenticate(&headers) {
             Ok(node_metadata) => {
-                println!("Got authenticated from grpc");
-                println!("{:?}",node_metadata);
+                trace!("node autheticated : {:?}",node_metadata);
                 req.extensions_mut().insert(node_metadata);
             Ok(req)
             },

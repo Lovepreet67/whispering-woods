@@ -18,6 +18,7 @@ message ChunkMeta {
   uint64 start_offset=2;
   uint64 end_offset=3;
   repeated DataNodeMeta location =4; 
+  string ticket = 5;
 }
 
 message FetchFileRequest{
