@@ -2,7 +2,10 @@ use tokio::{
     io::{AsyncReadExt, AsyncWriteExt, DuplexStream, Take, duplex},
     net::tcp::{OwnedReadHalf, OwnedWriteHalf},
 };
-use utilities::logger::{Instrument, Span, error, trace};
+use utilities::{
+    data_packet::DataPacket,
+    logger::{Instrument, Span, error, trace},
+};
 
 pub fn tee_tcp_stream(
     mut read_stream: Take<OwnedReadHalf>,
@@ -32,9 +35,12 @@ pub fn tee_tcp_stream(
             let bytes_written_to_pipeline = tx1.read_u64().await.unwrap_or(0);
             let bytes_written_to_file = tx2.read_u64().await.unwrap_or(0);
             if bytes_written_to_file!=bytes_written_to_pipeline {
-                error!("Error diffrent number of bytes written to pipeline({bytes_written_to_pipeline}) and bytes written to file ({bytes_written_to_pipeline})");
+                error!("Error diffrent number of bytes written to pipeline({bytes_written_to_pipeline}) and bytes written to file ({bytes_written_to_file})");
             }
-            if let Err(e) =  write_stream.write_u64(std::cmp::min(bytes_written_to_pipeline, bytes_written_to_file)).await{
+            let mut reply_packet = DataPacket::new();
+            reply_packet.insert("bytes_received".to_string(),std::cmp::min(bytes_written_to_pipeline, bytes_written_to_file).to_string());
+            let mut reply_packet_stream = reply_packet.encode();
+            if let Err(e) = tokio::io::copy(&mut reply_packet_stream,&mut write_stream ).await{
                 error!("Error while writing the received bytes to client {e}")
             }
             drop(tx1);

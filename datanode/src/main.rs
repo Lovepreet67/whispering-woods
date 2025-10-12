@@ -62,7 +62,7 @@ async fn main() -> Result<()> {
         .add_service(PeerServer::with_interceptor(ph, ticket_intercepter.clone()))
         .add_service(NamenodeDatanodeServer::new(NamenodeHandler::new(
             store.clone(),
-            ticket_decrypter,
+            ticket_decrypter.clone(),
         )))
         .serve(format!("0.0.0.0:{}", CONFIG.internal_grpc_port).parse()?);
     tokio::spawn(grpc_server);
@@ -73,6 +73,7 @@ async fn main() -> Result<()> {
         format!("0.0.0.0:{}", CONFIG.internal_tcp_port).clone(),
         store.clone(),
         state.clone(),
+        ticket_decrypter,
     )
     .await
     .unwrap();

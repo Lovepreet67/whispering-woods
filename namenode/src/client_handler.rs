@@ -147,7 +147,7 @@ impl ClientNameNode for ClientHandler {
                     .mint_ticket(
                         &node_meta.id,
                         &location.id,
-                        utilities::ticket::types::Operation::StoreChunk {
+                        utilities::ticket::types::Operation::FetchChunk {
                             chunk_id: chunk.to_string(),
                         },
                     )

@@ -76,7 +76,7 @@ echo "Starting $DATANODE_COUNT DataNodes..."
 for ((i = 0; i < DATANODE_COUNT; i++)); do
   grpc_port=$((3000 + i*10))
   tcp_port=$((3001 + i*10))
-  NODE_ID="datanode_${i+1}"
+  NODE_ID="datanode_$((i+1))"
   echo "Requesting certificate for node '$NODE_ID'..."
   CERT_RESPONSE=$(curl -s -X POST "$NAMENODE_URL/cert/issue" \
     -H "jwt_token: $TOKEN" \

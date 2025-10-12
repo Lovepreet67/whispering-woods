@@ -6,9 +6,10 @@ use proto::generated::{
     client_namenode::DataNodeMeta,
 };
 use std::str::FromStr;
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
+use tokio::io::AsyncRead;
 use tonic::{metadata::MetadataValue, transport::Channel};
 use utilities::{
+    data_packet::DataPacket,
     grpc_channel_pool::GRPC_CHANNEL_POOL,
     logger::{error, instrument, trace, tracing},
     result::Result,
@@ -52,19 +53,24 @@ impl DatanodeService {
             .await?;
         let tcp_addrs = &store_chunk_response.get_ref().address;
         trace!(%tcp_addrs,"Got tcp address");
-        // connect to tcp stream and push data as [chunk_id,write_mode,bytes from stream]
+        // we will first create the headers for tcp stream
+        let mut tcp_headers = DataPacket::new();
+        tcp_headers.insert("mode".to_string(), "Write".to_string());
+        tcp_headers.insert("chunk_id".to_string(), chunk_id.clone());
+        tcp_headers.insert("chunk_size".to_string(), chunk_size.to_string());
+        tcp_headers.insert("ticket".to_string(), ticket.clone());
+        let mut tcp_header_stream = tcp_headers.encode();
+        // connect to tcp stream
         let mut tcp_stream = TCP_CONNECTION_POOL.get_connection(tcp_addrs).await?;
-        trace!("writing chunk_id");
-        tcp_stream.write_all(chunk_id.as_bytes()).await?;
-        trace!("writing mode to file");
-        tcp_stream.write_u8(1).await?;
-        trace!("Writing chunk size to stream");
-        tcp_stream.write_u64(chunk_size).await?;
-        trace!("writing chunk to stream");
+        trace!("Writing tcp headers to stream");
+        tokio::io::copy(&mut tcp_header_stream, &mut tcp_stream).await?;
+        trace!("tcp headers written to stream");
         let bytes_written = tokio::io::copy(&mut read_stream, &mut tcp_stream).await?;
         trace!("{bytes_written} Bytes written");
         // we will check for the number of writen bytes to stream
-        let bytes_recieved_by_datanode: u64 = tcp_stream.read_u64().await?;
+        let reply_packet = DataPacket::decode(&mut tcp_stream).await?;
+        trace!("reply packet from the {:?}", reply_packet);
+        let bytes_recieved_by_datanode: u64 = reply_packet.get("bytes_received")?.parse()?;
         if bytes_written != bytes_recieved_by_datanode {
             error!(
                 "Bytes written to stream and recieved by stream are diffrent BytesWritten: {bytes_written}, BytesRecieved: {bytes_recieved_by_datanode}"
@@ -103,14 +109,16 @@ impl DatanodeService {
             .await?
             .into_inner();
         trace!(tcp_addrs = %fetch_chunk_response.address,"Got tcp stream addres for datanode");
+        let mut tcp_headers = DataPacket::new();
+        tcp_headers.insert("chunk_id".to_string(), chunk_id.clone());
+        tcp_headers.insert("ticket".to_string(), ticket.clone());
+        tcp_headers.insert("mode".to_string(), "Read".to_string());
+        let mut tcp_header_stream = tcp_headers.encode();
         let mut tcp_stream = TCP_CONNECTION_POOL
             .get_connection(&fetch_chunk_response.address)
             .await?;
-        trace!("writing chunk id");
-        tcp_stream.write_all(chunk_id.as_bytes()).await?;
-        // we will send the mode as read mode
-        trace!("Writing mode to stream");
-        tcp_stream.write_u8(2u8).await?;
+        trace!("writing headers");
+        tokio::io::copy(&mut tcp_header_stream, &mut tcp_stream).await?;
         // returning tcp stream as reader since data node will push file content to tcp stream now
         Ok(tcp_stream)
     }
