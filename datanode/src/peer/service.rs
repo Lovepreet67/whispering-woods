@@ -4,7 +4,8 @@ use proto::generated::{
         CommitChunkRequest, CreatePipelineRequest, StoreChunkRequest, peer_client::PeerClient,
     },
 };
-use tonic::transport::Channel;
+use std::str::FromStr;
+use tonic::{metadata::MetadataValue, transport::Channel};
 use utilities::{
     grpc_channel_pool::GRPC_CHANNEL_POOL,
     logger::{instrument, trace, tracing},
@@ -29,6 +30,7 @@ impl PeerService {
         &self,
         chunk_id: &str,
         replica_set: &[DataNodeMeta],
+        ticket: &str,
     ) -> Result<String> {
         trace!("Sending create pipeline request to peers");
         // since there are other replica we will have to send create pipeline message to next
@@ -36,20 +38,25 @@ impl PeerService {
         let response = retry_with_backoff(
             // we retry everything for now
             || async {
-                let create_pipeline_request = CreatePipelineRequest {
+                let mut create_pipeline_request = tonic::Request::new(CreatePipelineRequest {
                     chunk_id: chunk_id.to_owned(),
                     replica_set: replica_set.to_vec(),
-                };
+                });
+                create_pipeline_request
+                    .metadata_mut()
+                    .insert("ticket", MetadataValue::from_str(ticket)?);
                 // send this request to request
                 let mut client = self.get_grpc_connection(&replica_set[0].addrs).await?;
-                let request = tonic::Request::new(create_pipeline_request);
-                client.create_pipeline(request).await.map_err(|e| {
-                    format!(
-                        "error while sending the create pipline request, error : {}",
-                        e
-                    )
-                    .into()
-                })
+                client
+                    .create_pipeline(create_pipeline_request)
+                    .await
+                    .map_err(|e| {
+                        format!(
+                            "error while sending the create pipline request, error : {}",
+                            e
+                        )
+                        .into()
+                    })
             },
             3,
         )
@@ -58,15 +65,15 @@ impl PeerService {
         Ok(create_pipelince_response.address.to_owned())
     }
     #[instrument(name = "service_peer_store_chunk", skip(self))]
-    pub async fn store_chunk(&self, chunk_id: &str, addrs: &str) -> Result<String> {
+    pub async fn store_chunk(&self, chunk_id: &str, addrs: &str, ticket: &str) -> Result<String> {
         let response = retry_with_backoff(
             || async {
-                let store_chunk_request = StoreChunkRequest {
+                let mut store_chunk_request =tonic::Request::new( StoreChunkRequest {
                     chunk_id: chunk_id.to_owned(),
-                };
+                });
+                store_chunk_request.metadata_mut().insert("ticket", MetadataValue::from_str(ticket)?);
                 let mut client = self.get_grpc_connection(addrs).await?;
-                let request = tonic::Request::new(store_chunk_request);
-                client.store_chunk(request).await.map_err(|e| {
+                client.store_chunk(store_chunk_request).await.map_err(|e| {
                     format!(
                         "Error while sending store chunk request to {addrs}, for chunk {chunk_id}, {e:?}"
                     )
@@ -80,17 +87,23 @@ impl PeerService {
         Ok(store_chunk_response.address)
     }
     #[instrument(name = "service_peer_commit_chunk", skip(self))]
-    pub async fn commit_chunk(&self, chunk_id: &str, addrs: &str) -> Result<bool> {
+    pub async fn commit_chunk(&self, chunk_id: &str, addrs: &str, ticket: &str) -> Result<bool> {
         let response = retry_with_backoff(
             || async {
-                let commit_chunk_request = CommitChunkRequest {
+                let mut commit_chunk_request = tonic::Request::new(CommitChunkRequest {
                     chunk_id: chunk_id.to_owned(),
-                };
+                });
+                commit_chunk_request
+                    .metadata_mut()
+                    .insert("ticket", MetadataValue::from_str(ticket)?);
+
                 let mut client = self.get_grpc_connection(addrs).await?;
-                let request = tonic::Request::new(commit_chunk_request);
-                client.commit_chunk(request).await.map_err(|e| {
-                    format!("error while sending the commit message, error : {}", e).into()
-                })
+                client
+                    .commit_chunk(commit_chunk_request)
+                    .await
+                    .map_err(|e| {
+                        format!("error while sending the commit message, error : {}", e).into()
+                    })
             },
             3,
         )

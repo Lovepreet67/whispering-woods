@@ -12,19 +12,29 @@ use utilities::tcp_pool::TCP_CONNECTION_POOL;
 
 use crate::config::CONFIG;
 use crate::datanode_state::DatanodeState;
+use crate::namenode::service::NamenodeService;
 use crate::peer::service::PeerService;
+use utilities::ticket::ticket_decrypter::TicketDecrypter;
 
 pub struct ClientHandler {
     state: Arc<Mutex<DatanodeState>>,
     peer_service: PeerService,
+    namenode_service: NamenodeService,
     store: FileStorage,
+    ticket_decrypter: Arc<Box<dyn TicketDecrypter>>,
 }
 impl ClientHandler {
-    pub fn new(state: Arc<Mutex<DatanodeState>>, store: FileStorage) -> Self {
+    pub fn new(
+        state: Arc<Mutex<DatanodeState>>,
+        store: FileStorage,
+        ticket_decrypter: Arc<Box<dyn TicketDecrypter>>,
+    ) -> Self {
         Self {
-            state,
+            state: state.clone(),
             peer_service: PeerService {},
+            namenode_service: NamenodeService::new(state),
             store,
+            ticket_decrypter,
         }
     }
 }
@@ -49,10 +59,35 @@ impl ClientDataNode for ClientHandler {
         trace!(request = ?store_request,"Got request");
         // first we will send the create pipeling request to the next replica
         if store_request.replica_set.len() > 1 {
+            // to send a pipeline request to the peer we need ticket
+            let ticket = self
+                .namenode_service
+                .get_store_chunk_ticket(&store_request.replica_set[1].id, &store_request.chunk_id)
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::PermissionDenied,
+                        format!("Error while getting peer ticket : {e}"),
+                    )
+                })?;
+            let client_ticket = self
+                .ticket_decrypter
+                .decrypt_client_ticket(&ticket)
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::PermissionDenied,
+                        format!("Error while getting peer ticket : {e}"),
+                    )
+                })?;
+
             trace!("replica set is >1 so we are creating piplines");
             let tcp_address = match self
                 .peer_service
-                .create_pipeline(&store_request.chunk_id, &store_request.replica_set[1..])
+                .create_pipeline(
+                    &store_request.chunk_id,
+                    &store_request.replica_set[1..],
+                    &client_ticket.encrypted_server_ticket,
+                )
                 .await
             {
                 Ok(addrs) => addrs,
@@ -81,6 +116,10 @@ impl ClientDataNode for ClientHandler {
                 store_request.chunk_id.clone(),
                 store_request.replica_set[1].addrs.clone(),
             );
+            state.chunk_to_namenode_store_ticket.insert(
+                store_request.chunk_id.clone(),
+                client_ticket.encrypted_server_ticket,
+            );
             trace!(
                 "successfully established the tcp connection and stored in chunk to pipeline {:?}",
                 state.chunk_to_pipline
@@ -103,12 +142,21 @@ impl ClientDataNode for ClientHandler {
             .chunk_to_next_replica
             .remove(&commit_chunk_request.chunk_id)
         {
+            let ticket = state
+                .chunk_to_namenode_store_ticket
+                .remove(&commit_chunk_request.chunk_id)
+                .unwrap(); // if next replica is present that ticket will also be there as this is
+            // a last step so we will remove it
             trace!("Have next chunk so sending commit to it again");
             drop(state); // droping state to remove lock
             //send commit message to next_replica_node_grpc
             let _ = match self
                 .peer_service
-                .commit_chunk(&commit_chunk_request.chunk_id, &next_replica_node_grpc)
+                .commit_chunk(
+                    &commit_chunk_request.chunk_id,
+                    &next_replica_node_grpc,
+                    &ticket,
+                )
                 .await
             {
                 Ok(v) => v,

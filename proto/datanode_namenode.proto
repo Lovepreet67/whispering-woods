@@ -6,6 +6,7 @@ service DatanodeNamenode {
   rpc Connection(ConnectionRequest) returns (ConnectionResponse); // as connect name is already taken
   rpc HeartBeat(HeartBeatRequest) returns (HeartBeatResponse);
   rpc StateSync(StateSyncRequest) returns (StateSyncResponse);
+  rpc StoreChunkTicket(StoreChunkTicketRequest) returns (StoreChunkTicketResponse);
 }
 
 message ConnectionRequest{
@@ -31,4 +32,13 @@ message HeartBeatRequest {
 
 message HeartBeatResponse {
   bool connection_alive=1;
+}
+
+message StoreChunkTicketRequest{
+  string chunk_id = 1;
+  string source_id = 2;
+  string target_id = 3;
+}
+message StoreChunkTicketResponse {
+  string ticket  =1;
 }

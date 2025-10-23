@@ -44,6 +44,7 @@ pub struct Config {
     pub log_base: String,
     pub apm_endpoint: String,
     pub namenode_cert: String,
+    pub secret_key: String,
 }
 
 pub static CONFIG: Lazy<Config> = Lazy::new(|| {

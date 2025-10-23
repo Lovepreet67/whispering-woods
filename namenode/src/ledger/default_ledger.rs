@@ -1,5 +1,4 @@
 use std::{
-    error::Error,
     io::{BufRead, BufReader},
     time::UNIX_EPOCH,
 };
@@ -9,7 +8,11 @@ use tokio::{
     sync::mpsc::{self, Sender},
 };
 use tonic::async_trait;
-use utilities::logger::{debug, error, instrument, tracing};
+use utilities::{
+    logger::{debug, error, instrument, tracing},
+    result::Result,
+    ticket::{ticket_generator::DefaultTicketGenerator, ticket_mint::TicketMint},
+};
 
 use crate::namenode_state::{NamenodeState, chunk_details::ChunkDetails};
 
@@ -17,12 +20,13 @@ use super::{recorder::Recorder, replayer::Replayer};
 pub trait Ledger: Replayer + Recorder {}
 impl<T: Recorder + Replayer> Ledger for T {}
 
+#[derive(Clone)]
 pub struct DefaultLedger {
     log_store: String,
     producer: Sender<String>, // we should add file in ARC but currently logs will be generated only when
 }
 impl DefaultLedger {
-    pub async fn new(log_store: &str) -> Result<Self, Box<dyn Error>> {
+    pub async fn new(log_store: &str) -> Result<Self> {
         let (tx, mut rx) = mpsc::channel::<String>(16);
         if let Some(parent) = std::path::Path::new(&log_store).parent() {
             tokio::fs::create_dir_all(parent).await?;
@@ -87,11 +91,15 @@ impl Recorder for DefaultLedger {
         let log = format!("delete_chunk {file_name},{chunk_id}");
         self.insert_log(log).await
     }
+    async fn generate_key(&self, node_id: &str, key: &str) {
+        let log = format!("generate_key {node_id},{key}");
+        self.insert_log(log).await;
+    }
 }
 
 impl Replayer for DefaultLedger {
     #[instrument(name = "namenode_log_backup_replay", skip(self))]
-    fn replay(&self) -> Result<crate::namenode_state::NamenodeState, Box<dyn std::error::Error>> {
+    fn replay(&self) -> Result<(crate::namenode_state::NamenodeState, TicketMint)> {
         debug!(filepath = %self.log_store,"file path");
         let log_file = std::fs::OpenOptions::new()
             .read(true)
@@ -100,6 +108,8 @@ impl Replayer for DefaultLedger {
         let logs = BufReader::new(log_file).lines().map(|l| l.unwrap());
         debug!("created Buf reader");
         let mut state = NamenodeState::new();
+        let ticket_generator = DefaultTicketGenerator::new();
+        let mut ticket_mint = TicketMint::new(Box::new(ticket_generator));
         for log in logs {
             // we got the log entry
             let parts: Vec<&str> = log.split(' ').collect();
@@ -150,6 +160,10 @@ impl Replayer for DefaultLedger {
                             .expect("Delet record found for non existent chunk");
                         chunk_details.mark_deleted();
                     }
+                    "generate_key" => {
+                        let tokens: Vec<&str> = item.split(',').collect();
+                        ticket_mint.add_node_key_with_key(tokens[0], tokens[1])?;
+                    }
                     _ => {
                         error!(%log,"Log with invalid operation found");
                         return Err("Invalid operation".into());
@@ -160,6 +174,6 @@ impl Replayer for DefaultLedger {
             }
         }
         // now we will read the file line by line
-        Ok(state)
+        Ok((state, ticket_mint))
     }
 }

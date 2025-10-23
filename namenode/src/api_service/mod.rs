@@ -8,13 +8,20 @@ use crate::{
     api_service::routes::{auth, cert_isssuer, monitoring},
     certificates::certificate_generator::CertificateAuthority,
     config::CONFIG,
+    ledger::default_ledger::Ledger,
     namenode_state::state_snapshot::SnapshotStore,
 };
 use rocket_cors::CorsOptions;
 use std::sync::Arc;
-use utilities::{auth::AuthManager, logger::info};
+use tokio::sync::Mutex;
+use utilities::{auth::AuthManager, logger::info, ticket::ticket_mint::TicketMint};
 
-pub fn rocket(snapshot_store: SnapshotStore, ca: Arc<CertificateAuthority>) -> Rocket<Build> {
+pub fn rocket(
+    snapshot_store: SnapshotStore,
+    ca: Arc<CertificateAuthority>,
+    ticket_mint: Arc<Mutex<TicketMint>>,
+    ledger: Box<dyn Ledger + Send + Sync>,
+) -> Rocket<Build> {
     let cors = CorsOptions::default()
         .to_cors()
         .expect("error creating CORS fairing");
@@ -33,6 +40,8 @@ pub fn rocket(snapshot_store: SnapshotStore, ca: Arc<CertificateAuthority>) -> R
         .manage(snapshot_store)
         .manage(auth_manager)
         .manage(ca)
+        .manage(ticket_mint)
+        .manage(ledger)
         .mount("/monitoring", monitoring::routes())
         .mount("/auth", auth::routes())
         .mount("/cert", cert_isssuer::routes())

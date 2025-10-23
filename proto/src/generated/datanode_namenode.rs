@@ -39,6 +39,20 @@ pub struct HeartBeatResponse {
     #[prost(bool, tag = "1")]
     pub connection_alive: bool,
 }
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct StoreChunkTicketRequest {
+    #[prost(string, tag = "1")]
+    pub chunk_id: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub source_id: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
+    pub target_id: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct StoreChunkTicketResponse {
+    #[prost(string, tag = "1")]
+    pub ticket: ::prost::alloc::string::String,
+}
 /// Generated client implementations.
 pub mod datanode_namenode_client {
     #![allow(
@@ -208,6 +222,35 @@ pub mod datanode_namenode_client {
                 );
             self.inner.unary(req, path, codec).await
         }
+        pub async fn store_chunk_ticket(
+            &mut self,
+            request: impl tonic::IntoRequest<super::StoreChunkTicketRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::StoreChunkTicketResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/datanode_namenode.DatanodeNamenode/StoreChunkTicket",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new(
+                        "datanode_namenode.DatanodeNamenode",
+                        "StoreChunkTicket",
+                    ),
+                );
+            self.inner.unary(req, path, codec).await
+        }
     }
 }
 /// Generated server implementations.
@@ -242,6 +285,13 @@ pub mod datanode_namenode_server {
             request: tonic::Request<super::StateSyncRequest>,
         ) -> std::result::Result<
             tonic::Response<super::StateSyncResponse>,
+            tonic::Status,
+        >;
+        async fn store_chunk_ticket(
+            &self,
+            request: tonic::Request<super::StoreChunkTicketRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::StoreChunkTicketResponse>,
             tonic::Status,
         >;
     }
@@ -441,6 +491,52 @@ pub mod datanode_namenode_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let method = StateSyncSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/datanode_namenode.DatanodeNamenode/StoreChunkTicket" => {
+                    #[allow(non_camel_case_types)]
+                    struct StoreChunkTicketSvc<T: DatanodeNamenode>(pub Arc<T>);
+                    impl<
+                        T: DatanodeNamenode,
+                    > tonic::server::UnaryService<super::StoreChunkTicketRequest>
+                    for StoreChunkTicketSvc<T> {
+                        type Response = super::StoreChunkTicketResponse;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::StoreChunkTicketRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as DatanodeNamenode>::store_chunk_ticket(&inner, request)
+                                    .await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let method = StoreChunkTicketSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(

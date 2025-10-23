@@ -5,6 +5,8 @@ pub struct ReplicateChunkRequest {
     pub target_data_node: ::prost::alloc::string::String,
     #[prost(string, tag = "2")]
     pub chunk_id: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
+    pub ticket: ::prost::alloc::string::String,
 }
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct ReplicateChunkResponse {}

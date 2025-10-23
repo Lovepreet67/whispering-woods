@@ -2,20 +2,31 @@ use utilities::{
     logger::{Instrument, error, info, instrument, trace, tracing},
     result::Result,
     retry_policy::retry_with_backoff,
+    ticket::ticket_decrypter::TicketDecrypter,
 };
 
 use crate::{
     datanode_service::DatanodeService, file_chunker::FileChunker,
     namenode::service::NamenodeService,
 };
+use std::sync::Arc;
 
 pub struct StoreFileHandler {
     namenode: NamenodeService,
     datanode: DatanodeService,
+    ticket_decrypter: Arc<Box<dyn TicketDecrypter>>,
 }
 impl StoreFileHandler {
-    pub fn new(namenode: NamenodeService, datanode: DatanodeService) -> Self {
-        Self { namenode, datanode }
+    pub fn new(
+        namenode: NamenodeService,
+        datanode: DatanodeService,
+        ticket_decrypter: Arc<Box<dyn TicketDecrypter>>,
+    ) -> Self {
+        Self {
+            namenode,
+            datanode,
+            ticket_decrypter,
+        }
     }
     #[instrument(skip(self))]
     pub async fn store_file(
@@ -48,6 +59,10 @@ impl StoreFileHandler {
             let datanode = self.datanode.clone();
             let file_chunk = file_chunker.next_chunk().unwrap();
             let chunk_detail = chunk_detail.clone();
+            let server_ticket = self
+                .ticket_decrypter
+                .decrypt_client_ticket(&chunk_detail.ticket)?
+                .encrypted_server_ticket;
 
             handles.push(tokio::spawn(
                 async move {
@@ -60,6 +75,7 @@ impl StoreFileHandler {
                                     chunk_detail.id.clone(),
                                     chunk_detail.end_offset - chunk_detail.start_offset,
                                     chunk_detail.location.clone(),
+                                    server_ticket.clone(),
                                     read_stream,
                                 )
                                 .await;

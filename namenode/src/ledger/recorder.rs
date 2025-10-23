@@ -13,4 +13,5 @@ pub trait Recorder {
     );
     async fn delete_file(&self, file_name: &str);
     async fn delete_chunk(&self, file_name: &str, chunk_id: &str);
+    async fn generate_key(&self, node_id: &str, ticket: &str);
 }

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use proto::generated::datanode_namenode::{
-    ConnectionRequest, HeartBeatRequest, StateSyncRequest,
+    ConnectionRequest, HeartBeatRequest, StateSyncRequest, StoreChunkTicketRequest,
     datanode_namenode_client::DatanodeNamenodeClient,
 };
 use tokio::sync::Mutex;
@@ -95,5 +95,18 @@ impl NamenodeService {
                 state.to_be_deleted_chunks.insert(chunk);
             });
         Ok(())
+    }
+    #[instrument(name = "service_namenode_send_heart_beat", skip(self))]
+    pub async fn get_store_chunk_ticket(&self, target_id: &str, chunk_id: &str) -> Result<String> {
+        let store_chunk_request = StoreChunkTicketRequest {
+            source_id: CONFIG.datanode_id.clone(),
+            chunk_id: chunk_id.to_string(),
+            target_id: target_id.to_string(),
+        };
+        let mut namenode_client = self.get_grpc_connection(&CONFIG.namenode_addrs).await?;
+        let reseponse = namenode_client
+            .store_chunk_ticket(tonic::Request::new(store_chunk_request))
+            .await?;
+        Ok(reseponse.into_inner().ticket)
     }
 }

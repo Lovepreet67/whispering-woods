@@ -46,7 +46,11 @@ impl CertificateAuthority {
         Ok(Self { issuer, cert })
     }
 
-    pub fn issue_certificate(&self, node_id: String, node_type: NodeType) -> Result<Certificate> {
+    pub fn issue_certificate(
+        &self,
+        node_id: String,
+        node_type: NodeType,
+    ) -> Result<(Certificate, KeyPair)> {
         let leaf_key = KeyPair::generate_for(&PKCS_ECDSA_P256_SHA256)
             .expect("Error while generating the key pair");
 
@@ -61,7 +65,7 @@ impl CertificateAuthority {
             .distinguished_name
             .push(rcgen::DnType::OrganizationalUnitName, node_type);
         let cert = params.signed_by(&leaf_key, &self.issuer)?;
-        Ok(cert)
+        Ok((cert, leaf_key))
     }
     // pub fn revoke_certifcate() {}
     pub fn get_root_cert(&self) -> Certificate {
