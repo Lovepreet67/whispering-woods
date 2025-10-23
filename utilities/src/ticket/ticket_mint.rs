@@ -48,6 +48,23 @@ impl TicketMint {
         let ticket = self.ticket_generator.encrypt_client_ticket(&ct)?;
         Ok(BASE64_STANDARD.encode(ticket))
     }
+    pub fn get_server_ticket(&mut self, target_id: &str, op: Operation) -> Result<String> {
+        let minted_at_secs = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        // default ttl to 5 minutes
+        let ttl_secs = 5 * 60;
+        let st = ServerTicket {
+            target_node_id: target_id.to_string(),
+            minted_at_secs,
+            ttl_secs,
+            operation: op,
+        };
+        let encrypted_st = self.ticket_generator.encrypt_server_ticket(&st)?;
+        Ok(BASE64_STANDARD.encode(encrypted_st))
+    }
+
     pub fn add_node_key(&mut self, node_id: &str) -> Result<String> {
         self.ticket_generator.upsert_node_key(node_id)
     }

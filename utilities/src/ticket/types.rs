@@ -5,6 +5,8 @@ pub enum Operation {
     FetchChunk { chunk_id: String },
     StoreChunk { chunk_id: String }, // this will be used for both commit and store
     CreatePipeline { chunk_id: String },
+    DeleteChunk { chunk_id: String },
+    ReplicateChunk { chunk_id: String },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

@@ -51,6 +51,7 @@ async fn main() -> Result<()> {
     let ch = ClientHandler::new(state.clone(), store.clone(), ticket_decrypter.clone());
     let ph =
         peer::handler::PeerHandler::new(state.clone(), store.clone(), ticket_decrypter.clone());
+    let nh = NamenodeHandler::new(store.clone(), ticket_decrypter.clone());
     let ticket_intercepter = TicketIntercepter::new(ticket_decrypter.clone());
     // first we will start grpc server
     info!(grpc_addr = %CONFIG.external_grpc_addrs,"Creating grpc server");
@@ -60,10 +61,10 @@ async fn main() -> Result<()> {
             ticket_intercepter.clone(),
         ))
         .add_service(PeerServer::with_interceptor(ph, ticket_intercepter.clone()))
-        .add_service(NamenodeDatanodeServer::new(NamenodeHandler::new(
-            store.clone(),
-            ticket_decrypter.clone(),
-        )))
+        .add_service(NamenodeDatanodeServer::with_interceptor(
+            nh,
+            ticket_intercepter.clone(),
+        ))
         .serve(format!("0.0.0.0:{}", CONFIG.internal_grpc_port).parse()?);
     tokio::spawn(grpc_server);
     info!(grpc_addrs = %CONFIG.external_grpc_addrs,"grpc server is now running");

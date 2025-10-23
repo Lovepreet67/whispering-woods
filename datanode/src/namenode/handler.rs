@@ -3,11 +3,14 @@ use proto::generated::namenode_datanode::{
     namenode_datanode_server::NamenodeDatanode,
 };
 use storage::{file_storage::FileStorage, storage::Storage};
-use tokio::io::{AsyncWriteExt, copy};
 use utilities::{
+    data_packet::DataPacket,
     logger::{error, instrument, tracing},
     tcp_pool::TCP_CONNECTION_POOL,
-    ticket::ticket_decrypter::TicketDecrypter,
+    ticket::{
+        ticket_decrypter::TicketDecrypter,
+        types::{Operation, ServerTicket},
+    },
 };
 
 use crate::peer::service::PeerService;
@@ -31,16 +34,23 @@ impl NamenodeHandler {
         &self,
         tcp_address: String,
         chunk_id: String,
+        ticket: &str,
     ) -> utilities::result::Result<()> {
         // now we will transfer this chunk to target
-        let mut tcp_stream = TCP_CONNECTION_POOL.get_connection(&tcp_address).await?;
-        tcp_stream.write_all(chunk_id.as_bytes()).await?;
-        // first we will wrtie mode to write
-        tcp_stream.write_u8(1).await?;
+        let mut tcp_headers = DataPacket::new();
+        tcp_headers.insert("mode".to_string(), "Write".to_string());
+        tcp_headers.insert("chunk_id".to_string(), chunk_id.clone());
         let chunk_size = self.store.get_chunk_size(&chunk_id).await?;
-        tcp_stream.write_u64(chunk_size).await?;
+        tcp_headers.insert("chunk_size".to_string(), chunk_size.to_string());
+        tcp_headers.insert("ticket".to_string(), ticket.to_string());
+        let mut tcp_header_stream = tcp_headers.encode();
+        // connect to tcp stream
+        let mut tcp_stream = TCP_CONNECTION_POOL.get_connection(&tcp_address).await?;
+        tokio::io::copy(&mut tcp_header_stream, &mut tcp_stream).await?;
         let mut chunk_stream = self.store.read(chunk_id.clone()).await?;
-        copy(&mut chunk_stream, &mut tcp_stream).await?;
+        tokio::io::copy(&mut chunk_stream, &mut tcp_stream).await?;
+        let reply_packet = DataPacket::decode(&mut tcp_stream).await?;
+        let _bytes_recieved_by_datanode: u64 = reply_packet.get("bytes_received")?.parse()?;
         Ok(())
     }
 }
@@ -50,9 +60,24 @@ impl NamenodeDatanode for NamenodeHandler {
     #[instrument(name="grpc_namenode_delete_chunk_handler",skip(self,request), fields(chunk_id = %request.get_ref().id))]
     async fn delete_chunk(
         &self,
-        request: tonic::Request<DeleteChunkRequest>,
+        mut request: tonic::Request<DeleteChunkRequest>,
     ) -> Result<tonic::Response<DeleteChunkResponse>, tonic::Status> {
+        let server_ticket = request.extensions_mut().remove::<ServerTicket>().unwrap();
         let delete_chunk_request = request.into_inner();
+        if let Operation::DeleteChunk { chunk_id } = server_ticket.operation {
+            if delete_chunk_request.id != chunk_id {
+                return Err(tonic::Status::new(
+                    tonic::Code::InvalidArgument,
+                    "Chunk id in ticket is not matching with chunk to be deleted",
+                ));
+            }
+        } else {
+            return Err(tonic::Status::new(
+                tonic::Code::InvalidArgument,
+                "Ticket not valid for operation",
+            ));
+        }
+
         let chunk_id = delete_chunk_request.id;
         let exists = match self.store.delete(chunk_id).await {
             Ok(v) => v,
@@ -67,9 +92,24 @@ impl NamenodeDatanode for NamenodeHandler {
     #[instrument(name="grpc_namenode_replicate_chunk_handler",skip(self,request),fields(chunk_id= %request.get_ref().chunk_id,target_datanode=%request.get_ref().target_data_node))]
     async fn replicate_chunk(
         &self,
-        request: tonic::Request<ReplicateChunkRequest>,
+        mut request: tonic::Request<ReplicateChunkRequest>,
     ) -> Result<tonic::Response<ReplicateChunkResponse>, tonic::Status> {
+        let server_ticket = request.extensions_mut().remove::<ServerTicket>().unwrap();
         let replicate_chunk_request = request.into_inner();
+        if let Operation::ReplicateChunk { chunk_id } = server_ticket.operation {
+            if replicate_chunk_request.chunk_id != chunk_id {
+                return Err(tonic::Status::new(
+                    tonic::Code::InvalidArgument,
+                    "Chunk id in ticket is not matching with chunk to be replicated",
+                ));
+            }
+        } else {
+            return Err(tonic::Status::new(
+                tonic::Code::InvalidArgument,
+                "Ticket not valid for operation",
+            ));
+        }
+
         let chunk_id = replicate_chunk_request.chunk_id;
         let client_ticket = self
             .ticket_decrypter
@@ -97,7 +137,11 @@ impl NamenodeDatanode for NamenodeHandler {
             }
         };
         match self
-            .transfer_chunk_content(target_tcp_address, chunk_id.clone())
+            .transfer_chunk_content(
+                target_tcp_address,
+                chunk_id.clone(),
+                &client_ticket.encrypted_server_ticket,
+            )
             .await
         {
             Ok(_) => {}

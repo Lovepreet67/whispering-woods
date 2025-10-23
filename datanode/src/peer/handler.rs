@@ -9,7 +9,10 @@ use tokio::{net::TcpStream, sync::Mutex};
 use utilities::{
     logger::{error, instrument, trace, tracing},
     result::Result,
-    ticket::ticket_decrypter::{self, TicketDecrypter},
+    ticket::{
+        ticket_decrypter::TicketDecrypter,
+        types::{Operation, ServerTicket},
+    },
 };
 
 use crate::{
@@ -53,10 +56,25 @@ impl Peer for PeerHandler {
     #[instrument(name="grpc_peer_create_pipeline",skip(self,request), fields(chunk_id = %request.get_ref().chunk_id))]
     async fn create_pipeline(
         &self,
-        request: tonic::Request<CreatePipelineRequest>,
+        mut request: tonic::Request<CreatePipelineRequest>,
     ) -> std::result::Result<tonic::Response<CreatePipelineResponse>, tonic::Status> {
+        let server_ticket = request.extensions_mut().remove::<ServerTicket>().unwrap();
         let create_pipeline_request = request.get_ref();
         trace!(request = ?create_pipeline_request,"Got create pipeline request");
+        if let Operation::CreatePipeline { chunk_id } = server_ticket.operation {
+            if create_pipeline_request.chunk_id != chunk_id {
+                return Err(tonic::Status::new(
+                    tonic::Code::InvalidArgument,
+                    "Chunk id in ticket is not matching with chunk for which pipeline to be created",
+                ));
+            }
+        } else {
+            return Err(tonic::Status::new(
+                tonic::Code::InvalidArgument,
+                "Ticket not valid for operation",
+            ));
+        }
+
         // first we will send the create pipeling request to the next replica
         if create_pipeline_request.replica_set.len() > 1 {
             trace!(replica_set = ?create_pipeline_request.replica_set,"Passing create pipeline request to next");
@@ -116,11 +134,27 @@ impl Peer for PeerHandler {
         };
         Ok(tonic::Response::new(response))
     }
-    #[instrument(name="grpc_peer_store_chunk",skip(self,_request),fields(chunk_id = %_request.get_ref().chunk_id))]
+    #[instrument(name="grpc_peer_store_chunk",skip(self,request),fields(chunk_id = %request.get_ref().chunk_id))]
     async fn store_chunk(
         &self,
-        _request: tonic::Request<StoreChunkRequest>,
+        mut request: tonic::Request<StoreChunkRequest>,
     ) -> std::result::Result<tonic::Response<StoreChunkResponse>, tonic::Status> {
+        let server_ticket = request.extensions_mut().remove::<ServerTicket>().unwrap();
+        let store_chunk_request = request.into_inner();
+        if let Operation::StoreChunk { chunk_id } = server_ticket.operation {
+            if store_chunk_request.chunk_id != chunk_id {
+                return Err(tonic::Status::new(
+                    tonic::Code::InvalidArgument,
+                    "Chunk id in ticket is not matching with chunk to be stored",
+                ));
+            }
+        } else {
+            return Err(tonic::Status::new(
+                tonic::Code::InvalidArgument,
+                "Ticket not valid for operation",
+            ));
+        }
+
         let response = StoreChunkResponse {
             address: CONFIG.external_tcp_addrs.clone(),
         };
@@ -129,10 +163,32 @@ impl Peer for PeerHandler {
     #[instrument(name="grpc_peer_commit_chunk",skip(self,request), fields(chunk_id = %request.get_ref().chunk_id))]
     async fn commit_chunk(
         &self,
-        request: tonic::Request<CommitChunkRequest>,
+        mut request: tonic::Request<CommitChunkRequest>,
     ) -> std::result::Result<tonic::Response<CommitChunkResponse>, tonic::Status> {
         trace!("Got commit chunk request from peer");
+        let server_ticket = request.extensions_mut().remove::<ServerTicket>().unwrap();
         let commit_chunk_request = request.into_inner();
+        if let Operation::StoreChunk { chunk_id } = server_ticket.operation {
+            if commit_chunk_request.chunk_id != chunk_id {
+                return Err(tonic::Status::new(
+                    tonic::Code::InvalidArgument,
+                    "Chunk id in ticket is not matching with chunk to be commited",
+                ));
+            }
+        } else if let Operation::CreatePipeline { chunk_id } = server_ticket.operation {
+            if commit_chunk_request.chunk_id != chunk_id {
+                return Err(tonic::Status::new(
+                    tonic::Code::InvalidArgument,
+                    "Chunk id in ticket is not matching with chunk to be commited",
+                ));
+            }
+        } else {
+            return Err(tonic::Status::new(
+                tonic::Code::InvalidArgument,
+                "Ticket not valid for operation",
+            ));
+        }
+
         let mut state = self.state.lock().await;
         if let Some(next_replica_node_grpc) = state
             .chunk_to_next_replica
