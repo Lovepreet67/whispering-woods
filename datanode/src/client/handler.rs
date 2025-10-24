@@ -15,6 +15,7 @@ use crate::datanode_state::DatanodeState;
 use crate::namenode::service::NamenodeService;
 use crate::peer::service::PeerService;
 use utilities::ticket::ticket_decrypter::TicketDecrypter;
+use utilities::ticket::types::{Operation, ServerTicket};
 
 pub struct ClientHandler {
     state: Arc<Mutex<DatanodeState>>,
@@ -53,10 +54,25 @@ impl ClientDataNode for ClientHandler {
     #[instrument(name="grpc_client_store_chunk_handler",skip(self,request),fields(chunk_id =  %request.get_ref().chunk_id))]
     async fn store_chunk(
         &self,
-        request: tonic::Request<StoreChunkRequest>,
+        mut request: tonic::Request<StoreChunkRequest>,
     ) -> Result<tonic::Response<StoreChunkResponse>, tonic::Status> {
+        let server_ticket = request.extensions_mut().remove::<ServerTicket>().unwrap();
         let store_request = request.get_ref();
         trace!(request = ?store_request,"Got request");
+        if let Operation::StoreChunk { chunk_id } = server_ticket.operation {
+            if store_request.chunk_id != chunk_id {
+                return Err(tonic::Status::new(
+                    tonic::Code::InvalidArgument,
+                    "Chunk id in ticket is not matching with chunk for which chunk to be stored",
+                ));
+            }
+        } else {
+            return Err(tonic::Status::new(
+                tonic::Code::InvalidArgument,
+                "Ticket not valid for operation",
+            ));
+        }
+
         // first we will send the create pipeling request to the next replica
         if store_request.replica_set.len() > 1 {
             // to send a pipeline request to the peer we need ticket
@@ -133,10 +149,25 @@ impl ClientDataNode for ClientHandler {
     #[instrument(name="grpc_client_commit_chunk_handler",skip(self,request),fields(chunk_id =  %request.get_ref().chunk_id))]
     async fn commit_chunk(
         &self,
-        request: tonic::Request<CommitChunkRequest>,
+        mut request: tonic::Request<CommitChunkRequest>,
     ) -> Result<tonic::Response<CommitChunkResponse>, tonic::Status> {
-        trace!("Got commit chunk request from client");
+        let server_ticket = request.extensions_mut().remove::<ServerTicket>().unwrap();
         let commit_chunk_request = request.into_inner();
+        trace!(request = ?commit_chunk_request,"Got request");
+        if let Operation::StoreChunk { chunk_id } = server_ticket.operation {
+            if commit_chunk_request.chunk_id != chunk_id {
+                return Err(tonic::Status::new(
+                    tonic::Code::InvalidArgument,
+                    "Chunk id in ticket is not matching with chunk for which chunk to be commited",
+                ));
+            }
+        } else {
+            return Err(tonic::Status::new(
+                tonic::Code::InvalidArgument,
+                "Ticket not valid for operation",
+            ));
+        }
+
         let mut state = self.state.lock().await;
         if let Some(next_replica_node_grpc) = state
             .chunk_to_next_replica
@@ -190,10 +221,25 @@ impl ClientDataNode for ClientHandler {
     #[instrument(name="grpc_client_fetch_chunk_handler",skip(self,request),fields(chunk_id = %request.get_ref().chunk_id))]
     async fn fetch_chunk(
         &self,
-        request: tonic::Request<FetchChunkRequest>,
+        mut request: tonic::Request<FetchChunkRequest>,
     ) -> Result<tonic::Response<FetchChunkResponse>, tonic::Status> {
+        let server_ticket = request.extensions_mut().remove::<ServerTicket>().unwrap();
         let fetch_chunk_request = request.into_inner();
         trace!(request = ?fetch_chunk_request,"Got request");
+        if let Operation::FetchChunk { chunk_id } = server_ticket.operation {
+            if fetch_chunk_request.chunk_id != chunk_id {
+                return Err(tonic::Status::new(
+                    tonic::Code::InvalidArgument,
+                    "Chunk id in ticket is not matching with chunk for which chunk to be fetched",
+                ));
+            }
+        } else {
+            return Err(tonic::Status::new(
+                tonic::Code::InvalidArgument,
+                "Ticket not valid for operation",
+            ));
+        }
+
         let state = self.state.lock().await;
         trace!(?state, "Got current state of datanode");
         if !state

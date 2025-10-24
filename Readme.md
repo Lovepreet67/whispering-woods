@@ -43,6 +43,7 @@ It is implemented in **Rust** and provides a scalable, fault‑tolerant way to s
 - [Rust](https://www.rust-lang.org/tools/install)
 - [protoc](https://grpc.io/docs/protoc-installation/)
 - [Docker](https://www.docker.com/)
+- [jq](https://jqlang.org/download/)
 
 ### Setup
 You can run this project on host directly or use docker to run it as cluster. Running on Host machine is convenient for testing purpose since you don't have to build container again and again.
@@ -109,4 +110,6 @@ fetch FILE_NAME_ON_CLUSTER TARGET_FILE_PATH_ON_HOST
 ```
 delete FILE_NAME_ON_CLUSTER
 ```
+## Dashboard
+Whispering woods have a monitoring dashboard which display current cluster stats, available storage, active-inactive node. Files stored in clusters, chunks location and there health. To access this dashboard you need to use the **/dashboard/index.html** file once you login to the system using credentails dashboard will be acessible.
 
